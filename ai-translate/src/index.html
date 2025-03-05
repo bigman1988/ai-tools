@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel翻译工具</title>
+    <script defer src="main.bundle.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <div class="sidebar">
+            <h2>Excel翻译工具</h2>
+            <div class="file-input-container">
+                <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;" />
+                <div id="fileName" class="file-name"></div>
+                <div class="button-group">
+                    <button class="btn" id="uploadBtn">选择文件</button>
+                    <div class="source-lang-selector">
+                        <label for="sourceLang">源语言：</label>
+                        <select id="sourceLang" class="select-input">
+                            <option value="Chinese">中文</option>
+                            <option value="English">英文</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="actionButtons" class="button-group" style="display: none;">
+                    <div class="action-buttons-row">
+                        <button id="translateBtn" class="btn">翻译</button>
+                        <button id="stopTranslateBtn" class="btn" style="display: none;">停止翻译</button>
+                        <button id="exportBtn" class="btn">导出</button>
+                    </div>
+                    <div class="progress-wrapper">
+                        <div class="progress-container">
+                            <div class="progress-fill"></div>
+                            <div class="progress-text">0%</div>
+                        </div>
+                        <div class="progress-details" style="display: none;">
+                            已完成: 0 / 0 批次
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="log-container">
+                <h3>操作日志</h3>
+                <div id="logOutput" class="log-output"></div>
+            </div>
+        </div>
+        <div class="main-content">
+            <div class="table-output"></div>
+        </div>
+    </div>
+</body>
+</html>
