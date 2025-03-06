@@ -450,22 +450,24 @@ class ExcelTranslator {
                     this.progressBar.updateBatchProgress(progress);
                 },
                 (batch) => {
-                    // 每个批次完成后更新单元格并刷新显示
+                    // 每个批次完成后更新单元格，但不重新渲染整个表格
                     for (const task of batch.tasks) {
                         if (task.text) {
+                            // 更新数据模型
                             rows[task.rowIndex][task.targetColumnIndex] = task.text;
+                            
+                            // 直接更新DOM中的单元格内容，而不是重新渲染整个表格
+                            this.updateCellInDOM(task.rowIndex + 2, task.targetColumnIndex, task.text);
                         }
                     }
-                    // 更新表格显示
-                    this.displaySheet();
+                    
                     // 安全地访问可选属性
                     const displayName = batch.tasks.length > 0 ? batch.tasks[0].langDisplay : '';
                     this.log(`已更新 ${displayName} 的翻译结果`, 'info');
                 }
             );
             
-            // 最后再次更新表格显示，确保所有结果都已显示
-            this.displaySheet();
+            // 不需要再次更新表格显示，因为我们已经在每个批次完成后直接更新了单元格
             
             // 在processBatches方法中处理单元格更新
             this.log('所有翻译任务完成', 'success');
@@ -567,13 +569,6 @@ class ExcelTranslator {
         }
     }
 
-    // 注意: 此方法已经被 displaySheet 替代，保留仅为兼容性
-    private displayData(): void {
-        console.log('displayData() 被调用，重定向到 displaySheet()');
-        // 只调用 displaySheet 方法以确保一致性
-        this.displaySheet();
-    }
-
     private getExcelColumnName(index: number): string {
         let columnName = '';
         while (index >= 0) {
@@ -610,6 +605,55 @@ class ExcelTranslator {
         });
     }
 
+    /**
+     * 直接更新DOM中的单元格内容，而不重新渲染整个表格
+     * @param rowIndex 行索引
+     * @param colIndex 列索引
+     * @param text 新的单元格内容
+     */
+    private updateCellInDOM(rowIndex: number, colIndex: number, text: string): void {
+        const tableOutput = document.getElementById('tableOutput');
+        if (!tableOutput) return;
+        
+        const tableWrapper = tableOutput.querySelector('.table-wrapper');
+        if (!tableWrapper) return;
+        
+        const table = tableWrapper.querySelector('table');
+        if (!table) return;
+        
+        // 考虑到我们的表格有头部行，需要计算实际的行索引
+        // 在表格中，第一行是列头，所以数据行从第二行开始
+        const { headerRows } = this.data[this.currentSheet];
+        
+        // 如果是头部行，不进行更新
+        if (rowIndex < headerRows.length) return;
+        
+        // 计算实际的DOM行索引，考虑到我们可能隐藏了一些行
+        // 我们需要找到实际显示的行，而不是隐藏的行
+        const rows = table.querySelectorAll('tr');
+        let targetRow: HTMLTableRowElement | undefined = undefined;
+        
+        // 遍历所有行，找到对应的行
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const rowNumberCell = row.querySelector('.row-number');
+            if (rowNumberCell && rowNumberCell.textContent === (rowIndex + 1).toString()) {
+                targetRow = row;
+                break;
+            }
+        }
+        
+        if (!targetRow) return;
+        
+        // 找到对应的单元格，注意第一列是行号，所以需要+1
+        if (colIndex + 1 < targetRow.children.length) {
+            const cell = targetRow.children[colIndex + 1] as HTMLElement;
+            if (cell) {
+                cell.textContent = text;
+            }
+        }
+    }
+    
     private displaySheet(): void {
         // 检查tableOutput是否存在
         this.tableOutput = document.getElementById('tableOutput');
@@ -716,9 +760,10 @@ class ExcelTranslator {
                 .table-wrapper {
                     position: relative;
                     overflow: auto;
-                    max-height: 70vh;
+                    height: 100vh;
                     max-width: 100%;
                     border: 1px solid #ccc;
+                    margin: 1px;
                 }
                 
                 .excel-table {

@@ -29,7 +29,7 @@ export class TranslationService {
     public async translateBatch(batch: TranslationBatch, sourceLanguage: string): Promise<boolean> {
         try {
             // 获取批次的行号范围
-            const rowIndices = batch.tasks.map(task => task.rowIndex + 1); // +1 因为用户看到的行号从1开始
+            const rowIndices = batch.tasks.map(task => task.rowIndex + 3); // +3 因为用户看到的Excel行号从1开始，加上有两行头部
             const minRow = Math.min(...rowIndices);
             const maxRow = Math.max(...rowIndices);
             const rowRange = minRow === maxRow ? `第 ${minRow} 行` : `第 ${minRow} 行到第 ${maxRow} 行`;
@@ -206,7 +206,7 @@ export class TranslationService {
                 taskCount: batch.tasks.length,
                 tasks: batch.tasks.map(task => ({
                     rowIndex: task.rowIndex,
-                    text: task.text ? (task.text.length > 50 ? task.text.substring(0, 50) + '...' : task.text) : null,
+                    text: task.text ?  task.text : null,
                     textType: typeof task.text
                 }))
             });

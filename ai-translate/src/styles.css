@@ -12,8 +12,8 @@ body {
 }
 
 .sidebar {
-    width: 15%;
-    padding: 20px;
+    width: 17%;
+    padding: 0px;
     background-color: #f8f9fa;
     border-right: 1px solid #dee2e6;
     overflow-y: auto;
@@ -22,16 +22,16 @@ body {
 }
 
 .main-content {
-    width: 85%;
-    padding: 20px;
+    width: 83%;
+    padding: 0px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    height: 95vh;
+    height: 100%;
 }
 
 .file-input-container {
-    margin-bottom: 20px;
+    margin: 0px 10px 0px 10px;
     display: flex;
     flex-direction: column;
     gap: 15px;
@@ -42,7 +42,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    width: 100%;
+    margin: 0px 0px;
 }
 
 .action-buttons-row {
@@ -56,7 +56,7 @@ body {
 }
 
 .source-lang-selector {
-    margin: 10px 0;
+    margin: 10px;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -70,7 +70,7 @@ body {
 }
 
 .log-container {
-    margin-top: 20px;
+    margin-top: 5px;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -84,14 +84,14 @@ body {
 
 .log-output {
     flex: 1;
-    width: 100%;
+    width: 99%;
     height: 200px;
     overflow-y: auto;
     overflow-x: hidden;
     background-color: #f8f9fa;
     border: 1px solid #e9ecef;
     border-radius: 4px;
-    padding: 10px;
+    padding: 0px;
     font-family: monospace;
     font-size: 12px;
 }
@@ -284,8 +284,8 @@ body {
 
 /* 进度条容器样式 */
 .progress-wrapper {
-    margin-top: 10px;
-    width: 100%;
+    margin: 5px;
+    width: 95%;
 }
 
 .progress-container {
