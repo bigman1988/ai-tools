@@ -290,17 +290,41 @@ class ExcelTranslator {
                 // 获取源文本
                 const sourceText = row[sourceColumnIndex];
                 
-                // 如果源文本为空，跳过该行
-                if (!sourceText || sourceText.trim() === '') {
-                    this.log(`跳过第 ${rowIndex + 1} 行：源文本为空`, 'warning');
+                // 不要打印每个单元格的详细信息，只在出错时才打印
+                
+                // 安全地检查源文本
+                try {
+                    // 如果源文本为空，跳过该行
+                    if (!sourceText || (typeof sourceText === 'string' && sourceText.trim() === '')) {
+                        this.log(`跳过第 ${rowIndex + 1} 行：源文本为空`, 'warning');
+                        continue;
+                    }
+                    
+                    // 如果源文本不是字符串，尝试转换为字符串
+                    if (typeof sourceText !== 'string') {
+                        this.log(`警告: 第 ${rowIndex + 1} 行的源文本不是字符串，尝试转换`, 'warning');
+                        row[sourceColumnIndex] = String(sourceText);
+                    }
+                } catch (error) {
+                    console.error(`处理行 ${rowIndex + 1} 列 ${sourceColumnIndex} 的源文本时出错:`, error);
+                    this.log(`警告: 处理行 ${rowIndex + 1} 列 ${sourceColumnIndex} 时出错，跳过该行`, 'warning');
                     continue;
                 }
                 
                 // 遍历所有目标语言
                 for (const targetColumn of targetColumns) {
                     // 如果目标单元格已有内容，则跳过
-                    if (row[targetColumn.index] && row[targetColumn.index].trim() !== '') {
-                        continue;
+                    try {
+                        // 安全地检查目标单元格的内容
+                        const cellContent = row[targetColumn.index];
+                        if (cellContent !== null && cellContent !== undefined && 
+                            typeof cellContent === 'string' && cellContent.trim() !== '') {
+                            continue;
+                        }
+                    } catch (error) {
+                        console.error(`处理行 ${rowIndex + 1} 列 ${targetColumn.index} 时出错:`, error);
+                        this.log(`警告: 处理行 ${rowIndex + 1} 列 ${targetColumn.index} 时出错`, 'warning');
+                        // 如果出错，我们假设单元格为空，继续处理
                     }
                     
                     // 创建翻译任务
@@ -353,12 +377,13 @@ class ExcelTranslator {
                 let currentBatchTasks: TranslationTask[] = [];
                 let currentCharCount = 0;
                 const MAX_CHAR_COUNT = 2000; // 最大字符数限制
+                const MAX_TASKS_PER_BATCH = 20; // 每批次的任务数量限制
                 
                 for (let i = 0; i < tasksForLanguage.length; i++) {
                     const task = tasksForLanguage[i];
                     
                     // 如果当前批次已有20个任务或者加上当前任务会超过2000个字符，则创建新批次
-                    if (currentBatchTasks.length >= 20 || currentCharCount + task.text.length > MAX_CHAR_COUNT) {
+                    if (currentBatchTasks.length >= MAX_TASKS_PER_BATCH || currentCharCount + (typeof task.text === 'string' ? task.text.length : 0) > MAX_CHAR_COUNT) {
                         if (currentBatchTasks.length > 0) {
                             // 创建批次对象
                             const newBatch: TranslationBatch = {
@@ -446,8 +471,23 @@ class ExcelTranslator {
             this.log('所有翻译任务完成', 'success');
             
         } catch (error: any) {
+            // 记录更详细的错误信息
+            const errorMessage = error.message || String(error);
+            const errorStack = error.stack || 'No stack trace available';
+            
             console.error('翻译过程出错:', error);
-            this.log(`翻译过程出错: ${error.message || error}`, 'error');
+            console.error('错误堆栈:', errorStack);
+            
+            // 打印错误堆栈的第一行和第二行，通常包含错误位置
+            try {
+                const stackLines = errorStack.split('\n');
+                const errorInfo = stackLines.slice(0, 3).join('\n');
+                this.log(`翻译过程出错: ${errorMessage}\n${errorInfo}`, 'error');
+            } catch (e) {
+                // 如果解析错误堆栈失败，则使用原始错误消息
+                this.log(`翻译过程出错: ${errorMessage}`, 'error');
+                console.error('解析错误堆栈时出错:', e);
+            }
         } finally {
             translateBtn.style.display = 'inline-block';
             stopBtn.style.display = 'none';
@@ -584,6 +624,10 @@ class ExcelTranslator {
 
         // 清空现有内容
         this.tableOutput.innerHTML = '';
+        
+        // 创建表格容器，使用固定头的布局
+        const tableWrapper = document.createElement('div');
+        tableWrapper.className = 'table-wrapper';
 
         const table = document.createElement('table');
         table.className = 'excel-table';
@@ -660,7 +704,64 @@ class ExcelTranslator {
             table.appendChild(tr);
         });
 
-        this.tableOutput.appendChild(table);
+        tableWrapper.appendChild(table);
+        this.tableOutput.appendChild(tableWrapper);
+        
+        // 添加CSS样式使行号和列头固定
+        const styleId = 'fixed-table-style';
+        if (!document.getElementById(styleId)) {
+            const style = document.createElement('style');
+            style.id = styleId;
+            style.textContent = `
+                .table-wrapper {
+                    position: relative;
+                    overflow: auto;
+                    max-height: 70vh;
+                    max-width: 100%;
+                    border: 1px solid #ccc;
+                }
+                
+                .excel-table {
+                    border-collapse: collapse;
+                }
+                
+                .excel-table th, .excel-table td {
+                    border: 1px solid #ddd;
+                    padding: 8px;
+                    min-width: 100px;
+                }
+                
+                .excel-table th:first-child {
+                    position: sticky;
+                    left: 0;
+                    z-index: 3;
+                    background-color: #f2f2f2;
+                }
+                
+                .excel-table tr:first-child th {
+                    position: sticky;
+                    top: 0;
+                    z-index: 2;
+                    background-color: #f2f2f2;
+                }
+                
+                .excel-table tr:first-child th:first-child {
+                    position: sticky;
+                    top: 0;
+                    left: 0;
+                    z-index: 4;
+                    background-color: #f2f2f2;
+                }
+                
+                .excel-table .row-number {
+                    position: sticky;
+                    left: 0;
+                    z-index: 1;
+                    background-color: #f2f2f2;
+                }
+            `;
+            document.head.appendChild(style);
+        }
     }
 
     // ... 其他代码保持不变 ...

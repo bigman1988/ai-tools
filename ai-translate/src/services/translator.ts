@@ -28,11 +28,24 @@ export class TranslationService {
 
     public async translateBatch(batch: TranslationBatch, sourceLanguage: string): Promise<boolean> {
         try {
-            this.logCallback(`开始翻译批次 ${batch.batchId} - ${batch.tasks.length}个任务`, 'info');
-            console.log(`开始翻译批次 - ${batch.tasks.length}个任务:`, batch.tasks);
+            // 获取批次的行号范围
+            const rowIndices = batch.tasks.map(task => task.rowIndex + 1); // +1 因为用户看到的行号从1开始
+            const minRow = Math.min(...rowIndices);
+            const maxRow = Math.max(...rowIndices);
+            const rowRange = minRow === maxRow ? `第 ${minRow} 行` : `第 ${minRow} 行到第 ${maxRow} 行`;
+            
+            // 获取源语言和目标语言
+            const targetLang = batch.tasks.length > 0 ? batch.tasks[0].targetLang : '未知';
+            
+            this.logCallback(`开始翻译批次 ${batch.batchId} - ${sourceLanguage} 到 ${targetLang} - ${rowRange} - ${batch.tasks.length}个任务`, 'info');
+            
+            // 只在调试模式下打印详细任务信息
+            if (process.env.NODE_ENV === 'development') {
+                console.log(`开始翻译批次 - ${batch.tasks.length}个任务:`, batch.tasks);
+            }
             
             // 再次尝试从环境变量获取API密钥
-            if (!this.apiKey || this.apiKey.trim() === '') {
+            if (!this.apiKey || (typeof this.apiKey === 'string' && this.apiKey.trim() === '')) {
                 if (process.env.DEEPSEEK_API_KEY) {
                     this.apiKey = process.env.DEEPSEEK_API_KEY;
                     console.log('从环境变量获取到API密钥');
@@ -44,8 +57,24 @@ export class TranslationService {
                 }
             }
             
-            // 过滤掉空文本任务
-            const validTasks = batch.tasks.filter(task => task.text.trim() !== '');
+            // 过滤掉空文本任务或非字符串任务
+            const validTasks = batch.tasks.filter(task => {
+                try {
+                    // 如果任务文本不是字符串，尝试转换
+                    if (typeof task.text !== 'string') {
+                        console.error(`警告: 任务文本不是字符串，类型为 ${typeof task.text}`);
+                        if (task.text === null || task.text === undefined) {
+                            return false; // 跳过 null 或 undefined
+                        }
+                        // 尝试转换为字符串
+                        task.text = String(task.text);
+                    }
+                    return task.text.trim() !== '';
+                } catch (error) {
+                    console.error(`过滤任务时出错:`, error, task);
+                    return false; // 如果出错，跳过该任务
+                }
+            });
             if (validTasks.length === 0) {
                 this.logCallback('批次中没有有效的翻译任务', 'warning');
                 return false;
@@ -74,7 +103,7 @@ export class TranslationService {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${this.apiKey.trim()}`,
+                            'Authorization': `Bearer ${typeof this.apiKey === 'string' ? this.apiKey.trim() : this.apiKey}`,
                             'Accept': 'application/json'
                         },
                         body: JSON.stringify({
@@ -102,9 +131,18 @@ export class TranslationService {
                     }
 
                     const responseText = await response.text();
-                    console.log('API原始响应:', responseText);
+                    
+                    // 只在开发模式下打印API响应
+                    if (process.env.NODE_ENV === 'development') {
+                        console.log('API原始响应:', responseText);
+                    }
+                    
                     const data = JSON.parse(responseText);
-                    console.log('解析后的响应数据:', data);
+                    
+                    // 只在开发模式下打印解析后的数据
+                    if (process.env.NODE_ENV === 'development') {
+                        console.log('解析后的响应数据:', data);
+                    }
                     
                     if (!data.choices?.[0]?.message?.content) {
                         console.error('翻译返回数据格式错误:', data);
@@ -113,14 +151,19 @@ export class TranslationService {
                     }
 
                     // 获取翻译结果并分配给每个任务
-                    const translatedLines = data.choices[0].message.content.trim().split('\n');
+                    const translatedContent = data.choices[0].message.content;
+                    const translatedLines = typeof translatedContent === 'string' ? 
+                        translatedContent.trim().split('\n') : 
+                        [String(translatedContent)];
                     console.log(`收到 ${translatedLines.length} 行翻译结果，共 ${validTasks.length} 个任务`);
                     
                     // 确保翻译结果行数与任务数量匹配
                     const minLength = Math.min(translatedLines.length, validTasks.length);
                     
                     for (let i = 0; i < minLength; i++) {
-                        validTasks[i].text = translatedLines[i].trim();
+                        const translatedLine = translatedLines[i];
+                        validTasks[i].text = typeof translatedLine === 'string' ? 
+                            translatedLine.trim() : String(translatedLine);
                         console.log(`翻译成功 - 行号: ${validTasks[i].rowIndex + 1}, 译文: ${validTasks[i].text}`);
                     }
                     
@@ -136,6 +179,14 @@ export class TranslationService {
                     
                 } catch (error: any) {
                     console.error(`批量翻译失败 - 批次 ${batch.batchId}`, error);
+                    
+                    // 打印批次信息以帮助调试
+                    console.error('批次任务详情:', batch.tasks.map(task => ({
+                        rowIndex: task.rowIndex,
+                        text: task.text,
+                        textType: typeof task.text
+                    })));
+                    
                     this.logCallback(`批次 ${batch.batchId} 翻译失败: ${error.message || error}`, 'error');
                     // 标记翻译失败
                     batch.success = false;
@@ -147,6 +198,19 @@ export class TranslationService {
             
         } catch (error: any) {
             console.error('批次翻译失败:', error);
+            
+            // 打印错误堆栈和批次详细信息
+            console.error('错误堆栈:', error.stack || '无堆栈信息');
+            console.error('批次详细信息:', {
+                batchId: batch.batchId,
+                taskCount: batch.tasks.length,
+                tasks: batch.tasks.map(task => ({
+                    rowIndex: task.rowIndex,
+                    text: task.text ? (task.text.length > 50 ? task.text.substring(0, 50) + '...' : task.text) : null,
+                    textType: typeof task.text
+                }))
+            });
+            
             this.logCallback(`批次翻译失败: ${error.message || error}`, 'error');
             // 标记翻译失败
             batch.success = false;
