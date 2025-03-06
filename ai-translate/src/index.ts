@@ -451,14 +451,26 @@ class ExcelTranslator {
                 },
                 (batch) => {
                     // 每个批次完成后更新单元格，但不重新渲染整个表格
+                    let tasksWithResults = 0;
+                    let tasksWithoutResults = 0;
+                    
                     for (const task of batch.tasks) {
-                        if (task.text) {
+                        // 只有当任务有翻译结果时才更新单元格
+                        if (task.text && typeof task.text === 'string' && task.text.trim() !== '') {
                             // 更新数据模型
                             rows[task.rowIndex][task.targetColumnIndex] = task.text;
                             
                             // 直接更新DOM中的单元格内容，而不是重新渲染整个表格
                             this.updateCellInDOM(task.rowIndex + 2, task.targetColumnIndex, task.text);
+                            tasksWithResults++;
+                        } else {
+                            tasksWithoutResults++;
                         }
+                    }
+                    
+                    // 如果有任务没有收到翻译结果，显示警告
+                    if (tasksWithoutResults > 0) {
+                        this.log(`警告: ${tasksWithoutResults} 个任务没有收到翻译结果`, 'warning');
                     }
                     
                     // 安全地访问可选属性
@@ -764,6 +776,7 @@ class ExcelTranslator {
                     max-width: 100%;
                     border: 1px solid #ccc;
                     margin: 1px;
+                    scroll-padding-top: 40px; /* 添加滚动填充，防止内容被固定头部遮挡 */
                 }
                 
                 .excel-table {
@@ -783,19 +796,30 @@ class ExcelTranslator {
                     background-color: #f2f2f2;
                 }
                 
+                .excel-table thead th {
+                    position: sticky;
+                    top: 0;
+                    z-index: 2;
+                    background-color: #f2f2f2;
+                    box-shadow: 0 1px 0 rgba(0,0,0,0.1); /* 添加底部阴影，增强视觉效果 */
+                }
+                
                 .excel-table tr:first-child th {
                     position: sticky;
                     top: 0;
                     z-index: 2;
                     background-color: #f2f2f2;
+                    box-shadow: 0 1px 0 rgba(0,0,0,0.1); /* 添加底部阴影，增强视觉效果 */
                 }
                 
+                /* 处理左上角单元格，同时固定在顶部和左侧 */
                 .excel-table tr:first-child th:first-child {
                     position: sticky;
                     top: 0;
                     left: 0;
-                    z-index: 4;
+                    z-index: 4; /* 最高层级，确保始终显示在最上层 */
                     background-color: #f2f2f2;
+                    box-shadow: 1px 1px 0 rgba(0,0,0,0.1); /* 添加右侧和底部阴影 */
                 }
                 
                 .excel-table .row-number {
