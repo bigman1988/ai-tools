@@ -115,8 +115,18 @@ body {
 .excel-table {
     width: 100%;
     border-collapse: collapse;
-    table-layout: auto;
+    table-layout: fixed; /* 使用固定表格布局，确保单元格宽度限制生效 */
     min-width: 100%;
+    border-spacing: 0; /* 消除单元格间的间距 */
+}
+
+/* 第一列（行号列）的样式 */
+.excel-table td:first-child,
+.excel-table th:first-child {
+    min-width: 50px;
+    max-width: 80px;
+    text-align: center;
+    background-color: #f8f9fa;
 }
 
 .excel-table th,
@@ -124,10 +134,17 @@ body {
     border: 1px solid #ddd;
     padding: 8px;
     text-align: left;
-    min-width: 150px;
-    max-width: none;
+    min-width: 100px;
+    max-width: 200px; /* 设置最大宽度为200px */
+    width: 200px; /* 固定宽度为200px */
     white-space: normal;
     word-wrap: break-word;
+    word-break: break-word; /* 允许在单词内部换行 */
+    overflow: visible; /* 改为可见，确保内容不被裁剪 */
+    height: auto !important; /* 高度自动调整，使用!important确保优先级 */
+    vertical-align: top; /* 内容顶部对齐 */
+    line-height: 1.5; /* 增加行高，使文本更易读 */
+    box-sizing: border-box; /* 确保内边距和边框不会增加元素宽度 */
 }
 
 .excel-table th {
@@ -185,6 +202,23 @@ body {
     color: #333;
     font-size: 14px;
     min-width: 70px;
+}
+
+/* 添加样式使单元格内容过多时能正确显示 */
+.excel-table tr {
+    height: auto !important; /* 行高自动调整 */
+}
+
+/* 确保长文本在单元格中正确换行 */
+.excel-table td div,
+.excel-table td span,
+.excel-table td p,
+.excel-table td {
+    max-width: 100%;
+    word-wrap: break-word;
+    word-break: break-word;
+    white-space: pre-wrap; /* 保留空白并允许换行 */
+    text-overflow: ellipsis; /* 文本过长时显示省略号 */
 }
 
 .select-input {

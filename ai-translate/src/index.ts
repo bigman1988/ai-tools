@@ -760,7 +760,7 @@ class ExcelTranslator {
                 .table-wrapper {
                     position: relative;
                     overflow: auto;
-                    height: 100vh;
+                    height: 99vh;
                     max-width: 100%;
                     border: 1px solid #ccc;
                     margin: 1px;
