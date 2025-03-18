@@ -1,6 +1,6 @@
 import './styles.css';
-import { excelImporter } from './services/excel-importer';
-import { databaseService, TranslationEntry } from './services/database';
+import { apiService } from './services/api';
+import { TranslationEntry } from './services/database';
 import * as XLSX from 'xlsx';
 
 // 添加全局实例变量，用于检查是否已经初始化
@@ -10,33 +10,44 @@ declare global {
     }
 }
 
-class KnowledgeBaseManager {
-    private fileInput: HTMLInputElement;
-    private fileName: HTMLDivElement;
-    private uploadBtn: HTMLButtonElement;
-    private importBtn: HTMLButtonElement;
-    private exportBtn: HTMLButtonElement;
-    private actionButtons: HTMLDivElement;
-    private logOutput: HTMLDivElement;
-    private progressFill: HTMLDivElement;
-    private progressText: HTMLDivElement;
-    private progressDetails: HTMLDivElement;
-    private searchInput: HTMLInputElement;
-    private searchBtn: HTMLButtonElement;
-    private kbTableOutput: HTMLDivElement;
-    private addEntryBtn: HTMLButtonElement;
-    private deleteSelectedBtn: HTMLButtonElement;
-    private sourceLang: HTMLSelectElement;
-    private targetLang: HTMLSelectElement;
-    private selectedFile: File | null = null;
+export class KnowledgeBaseManager {
     private currentEntries: TranslationEntry[] = [];
+    private selectedSourceLang: string = 'zh-CN';
+
+    // 使用!操作符告诉TypeScript这些属性会在构造函数中被初始化
+    private fileInput!: HTMLInputElement;
+    private fileName!: HTMLDivElement;
+    private uploadBtn!: HTMLButtonElement;
+    private importBtn!: HTMLButtonElement;
+    private actionButtons!: HTMLDivElement;
+    private logOutput!: HTMLDivElement;
+    private progressFill!: HTMLDivElement;
+    private progressText!: HTMLDivElement;
+    private progressDetails!: HTMLDivElement;
+    private searchInput!: HTMLInputElement;
+    private searchBtn!: HTMLButtonElement;
+    private kbTableOutput!: HTMLDivElement;
+    private addEntryBtn!: HTMLButtonElement;
+    private deleteSelectedBtn!: HTMLButtonElement;
+    private sourceLang!: HTMLSelectElement;
 
     constructor() {
+        // 初始化所有DOM元素
+        this.initializeDOMElements();
+        
+        // 初始化API服务
+        this.initializeDatabase();
+        
+        // 初始化事件监听器
+        this.initializeEventListeners();
+    }
+
+    private initializeDOMElements(): void {
+        // 初始化所有DOM元素引用
         this.fileInput = document.getElementById('fileInput') as HTMLInputElement;
         this.fileName = document.getElementById('fileName') as HTMLDivElement;
         this.uploadBtn = document.getElementById('uploadBtn') as HTMLButtonElement;
         this.importBtn = document.getElementById('importBtn') as HTMLButtonElement;
-        this.exportBtn = document.getElementById('exportBtn') as HTMLButtonElement;
         this.actionButtons = document.getElementById('actionButtons') as HTMLDivElement;
         this.logOutput = document.getElementById('logOutput') as HTMLDivElement;
         this.progressFill = document.querySelector('.progress-fill') as HTMLDivElement;
@@ -48,132 +59,96 @@ class KnowledgeBaseManager {
         this.addEntryBtn = document.getElementById('addEntryBtn') as HTMLButtonElement;
         this.deleteSelectedBtn = document.getElementById('deleteSelectedBtn') as HTMLButtonElement;
         this.sourceLang = document.getElementById('sourceLang') as HTMLSelectElement;
-        this.targetLang = document.getElementById('targetLang') as HTMLSelectElement;
+    }
 
-        // 检查是否已经初始化过，避免重复注册事件监听器
-        if (!window.knowledgeBaseManagerInstance) {
-            console.log('初始化知识库管理器事件监听器和数据库');
-            this.initEventListeners();
-            this.initDatabase();
-            window.knowledgeBaseManagerInstance = this;
-        } else {
-            console.log('检测到已存在知识库管理器实例，跳过事件监听器初始化');
+    private async initializeDatabase(): Promise<void> {
+        try {
+            // 使用API服务初始化数据库连接（实际上是检查API服务器是否可用）
+            await apiService.initializeDatabase();
+            this.log('API服务器连接成功');
+            await this.loadEntries();
+        } catch (error) {
+            this.log(`API服务器连接失败: ${(error as Error).message}`, 'error');
         }
     }
 
-    private initEventListeners(): void {
-        // 文件上传按钮点击事件
+    private async initializeEventListeners() {
+        // 初始化源语言选择器
+        this.sourceLang.value = this.selectedSourceLang;
+        this.sourceLang.addEventListener('change', (e) => {
+            this.selectedSourceLang = (e.target as HTMLSelectElement).value;
+        });
+
+        // 初始化文件选择按钮
         this.uploadBtn.addEventListener('click', () => {
             this.fileInput.click();
         });
 
-        // 文件选择事件
-        this.fileInput.addEventListener('change', (event) => {
-            const target = event.target as HTMLInputElement;
-            if (target.files && target.files.length > 0) {
-                this.selectedFile = target.files[0];
-                this.fileName.textContent = this.selectedFile.name;
+        // 初始化文件输入
+        this.fileInput.addEventListener('change', (e) => {
+            const files = (e.target as HTMLInputElement).files;
+            if (files && files.length > 0) {
+                const file = files[0];
+                this.fileName.textContent = file.name;
+                
                 this.actionButtons.style.display = 'block';
-                this.log(`已选择文件: ${this.selectedFile.name}`);
             }
         });
 
-        // 导入按钮点击事件
+        // 初始化导入按钮
         this.importBtn.addEventListener('click', async () => {
-            if (!this.selectedFile) {
-                this.log('请先选择一个Excel文件', 'error');
+            const files = this.fileInput.files;
+            
+            if (!files || files.length === 0) {
+                this.log('请先选择要导入的文件', 'error');
                 return;
             }
 
             try {
-                this.importBtn.disabled = true;
-                this.log('开始导入数据...');
-                this.showProgress(0);
-                this.progressDetails.style.display = 'block';
-                this.progressDetails.textContent = '正在处理...';
-
-                const importedCount = await excelImporter.importExcelToDatabase(this.selectedFile);
-                
-                this.showProgress(100);
-                this.progressDetails.textContent = `已完成: ${importedCount} 条目`;
-                this.log(`成功导入 ${importedCount} 条翻译条目到数据库`);
-                
-                // 刷新表格显示
+                const result = await apiService.importExcel(files[0]);
+                this.log(`导入成功，共导入 ${result.count} 条记录`);
                 await this.loadEntries();
+                
+                // 清理文件选择
+                this.fileInput.value = '';
+                this.fileName.textContent = '';
+                this.actionButtons.style.display = 'none';
             } catch (error) {
                 this.log(`导入失败: ${(error as Error).message}`, 'error');
-                this.showProgress(0);
-            } finally {
-                this.importBtn.disabled = false;
             }
         });
 
-        // 导出按钮点击事件
-        this.exportBtn.addEventListener('click', async () => {
-            try {
-                this.exportBtn.disabled = true;
-                this.log('开始导出数据...');
-                
-                // 获取所有条目
-                const entries = await databaseService.getEntries(undefined, 10000, 0);
-                
-                if (entries.length === 0) {
-                    this.log('没有数据可导出', 'warning');
-                    return;
-                }
-                
-                // 创建工作簿
-                const workbook = XLSX.utils.book_new();
-                
-                // 将数据转换为工作表
-                const worksheet = XLSX.utils.json_to_sheet(entries);
-                
-                // 将工作表添加到工作簿
-                XLSX.utils.book_append_sheet(workbook, worksheet, '翻译数据');
-                
-                // 导出为Excel文件
-                XLSX.writeFile(workbook, '翻译知识库导出.xlsx');
-                
-                this.log(`成功导出 ${entries.length} 条翻译条目`);
-            } catch (error) {
-                this.log(`导出失败: ${(error as Error).message}`, 'error');
-            } finally {
-                this.exportBtn.disabled = false;
+        // 初始化搜索按钮
+        this.searchBtn.addEventListener('click', () => {
+            this.loadEntries(this.searchInput.value);
+        });
+
+        // 初始化搜索输入框的回车事件
+        this.searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.loadEntries(this.searchInput.value);
             }
         });
 
-        // 搜索按钮点击事件
-        this.searchBtn.addEventListener('click', async () => {
-            const searchTerm = this.searchInput.value.trim();
-            await this.loadEntries(searchTerm);
-        });
-
-        // 搜索输入框回车事件
-        this.searchInput.addEventListener('keyup', async (event) => {
-            if (event.key === 'Enter') {
-                const searchTerm = this.searchInput.value.trim();
-                await this.loadEntries(searchTerm);
-            }
-        });
-
-        // 添加条目按钮点击事件
+        // 初始化添加条目按钮
         this.addEntryBtn.addEventListener('click', () => {
             this.showAddEntryForm();
         });
 
-        // 删除所选按钮点击事件
+        // 初始化删除所选按钮
         this.deleteSelectedBtn.addEventListener('click', async () => {
             const selectedIds = this.getSelectedEntryIds();
             if (selectedIds.length === 0) {
-                this.log('请先选择要删除的条目', 'warning');
+                this.log('请先选择要删除的条目', 'error');
                 return;
             }
 
-            if (confirm(`确定要删除选中的 ${selectedIds.length} 条记录吗？`)) {
+            const confirmDelete = confirm(`确定要删除选中的 ${selectedIds.length} 条记录吗？`);
+            if (confirmDelete) {
                 try {
                     let deletedCount = 0;
                     for (const id of selectedIds) {
-                        const success = await databaseService.deleteEntry(id);
+                        const success = await apiService.deleteEntry(id.toString());
                         if (success) deletedCount++;
                     }
                     
@@ -186,161 +161,147 @@ class KnowledgeBaseManager {
         });
     }
 
-    private async initDatabase(): Promise<void> {
-        try {
-            await databaseService.initializeDatabase();
-            this.log('数据库连接成功');
-            await this.loadEntries();
-        } catch (error) {
-            this.log(`数据库初始化失败: ${(error as Error).message}`, 'error');
-        }
-    }
-
     private async loadEntries(searchTerm?: string): Promise<void> {
         try {
             this.log('加载翻译条目...');
-            this.currentEntries = await databaseService.getEntries(searchTerm);
-            this.renderEntriesTable(this.currentEntries);
+            this.currentEntries = await apiService.getEntries(searchTerm);
+            this.renderTable(this.currentEntries);
             this.log(`已加载 ${this.currentEntries.length} 条翻译条目`);
         } catch (error) {
             this.log(`加载条目失败: ${(error as Error).message}`, 'error');
         }
     }
 
-    private renderEntriesTable(entries: TranslationEntry[]): void {
-        if (entries.length === 0) {
-            this.kbTableOutput.innerHTML = '<div class="empty-state">没有找到翻译条目</div>';
-            return;
-        }
+    private renderTable(entries: TranslationEntry[]): void {
+        const container = document.getElementById('kbTableOutput');
+        if (!container) return;
 
-        // 创建表格
-        let tableHtml = `
-            <table class="kb-table">
-                <thead>
-                    <tr>
-                        <th><input type="checkbox" id="selectAll"></th>
-                        <th>ID</th>
-                        <th>中文</th>
-                        <th>英语</th>
-                        <th>日语</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody>
+        // 创建表格容器
+        container.innerHTML = `
+            <div class="table-wrapper">
+                <table class="kb-table">
+                    <thead>
+                        <tr>
+                            <th class="checkbox-cell"><input type="checkbox" id="selectAll"></th>
+                            <th>中文</th>
+                            <th>英文</th>
+                            <th>日文</th>
+                            <th>韩文</th>
+                            <th>西班牙文</th>
+                            <th>法文</th>
+                            <th>德文</th>
+                            <th>俄文</th>
+                            <th>泰文</th>
+                            <th>意大利文</th>
+                            <th>印尼文</th>
+                            <th>葡萄牙文</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="entriesTableBody">
+                    </tbody>
+                </table>
+            </div>
         `;
 
-        // 添加表格行
-        entries.forEach(entry => {
-            tableHtml += `
-                <tr data-id="${entry.id}">
-                    <td><input type="checkbox" class="entry-checkbox"></td>
-                    <td>${entry.id}</td>
-                    <td>${this.escapeHtml(entry.Chinese)}</td>
-                    <td>${this.escapeHtml(entry.English)}</td>
-                    <td>${this.escapeHtml(entry.Japanese)}</td>
-                    <td>
-                        <button class="btn-small view-btn">查看</button>
-                        <button class="btn-small edit-btn">编辑</button>
-                        <button class="btn-small delete-btn">删除</button>
-                    </td>
-                </tr>
+        // 获取表格体
+        const tableBody = document.getElementById('entriesTableBody');
+        if (!tableBody) return;
+
+        // 添加表格内容
+        entries.forEach((entry, index) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="checkbox-cell"><input type="checkbox" class="entry-checkbox" data-id="${entry.Chinese}"></td>
+                <td>${this.escapeHtml(entry.Chinese || '')}</td>
+                <td>${this.escapeHtml(entry.English || '')}</td>
+                <td>${this.escapeHtml(entry.Japanese || '')}</td>
+                <td>${this.escapeHtml(entry.Korean || '')}</td>
+                <td>${this.escapeHtml(entry.Spanish || '')}</td>
+                <td>${this.escapeHtml(entry.French || '')}</td>
+                <td>${this.escapeHtml(entry.German || '')}</td>
+                <td>${this.escapeHtml(entry.Russian || '')}</td>
+                <td>${this.escapeHtml(entry.Thai || '')}</td>
+                <td>${this.escapeHtml(entry.Italian || '')}</td>
+                <td>${this.escapeHtml(entry.Indonesian || '')}</td>
+                <td>${this.escapeHtml(entry.Portuguese || '')}</td>
+                <td>
+                    <button class="btn-small view-btn" data-id="${entry.Chinese}">查看</button>
+                    <button class="btn-small edit-btn" data-id="${entry.Chinese}">编辑</button>
+                </td>
             `;
+            tableBody.appendChild(tr);
         });
-
-        tableHtml += `
-                </tbody>
-            </table>
-        `;
-
-        this.kbTableOutput.innerHTML = tableHtml;
 
         // 添加全选功能
         const selectAllCheckbox = document.getElementById('selectAll') as HTMLInputElement;
-        selectAllCheckbox.addEventListener('change', () => {
-            const checkboxes = document.querySelectorAll('.entry-checkbox') as NodeListOf<HTMLInputElement>;
-            checkboxes.forEach(checkbox => {
-                checkbox.checked = selectAllCheckbox.checked;
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', () => {
+                const checkboxes = document.querySelectorAll('.entry-checkbox') as NodeListOf<HTMLInputElement>;
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = selectAllCheckbox.checked;
+                });
             });
-        });
+        }
 
-        // 添加行操作按钮事件
-        document.querySelectorAll('.view-btn').forEach(btn => {
-            btn.addEventListener('click', (event) => {
-                const row = (event.target as HTMLElement).closest('tr');
-                const id = Number(row?.getAttribute('data-id'));
-                const entry = this.currentEntries.find(e => e.id === id);
+        // 添加查看按钮事件监听器
+        const viewButtons = document.querySelectorAll('.view-btn') as NodeListOf<HTMLButtonElement>;
+        viewButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const chinese = button.getAttribute('data-id') || '';
+                const entry = this.currentEntries.find(e => e.Chinese === chinese);
                 if (entry) {
                     this.showEntryDetails(entry);
                 }
             });
         });
 
-        document.querySelectorAll('.edit-btn').forEach(btn => {
-            btn.addEventListener('click', (event) => {
-                const row = (event.target as HTMLElement).closest('tr');
-                const id = Number(row?.getAttribute('data-id'));
-                const entry = this.currentEntries.find(e => e.id === id);
+        // 添加编辑按钮事件监听器
+        const editButtons = document.querySelectorAll('.edit-btn') as NodeListOf<HTMLButtonElement>;
+        editButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const chinese = button.getAttribute('data-id') || '';
+                const entry = this.currentEntries.find(e => e.Chinese === chinese);
                 if (entry) {
                     this.showEditEntryForm(entry);
-                }
-            });
-        });
-
-        document.querySelectorAll('.delete-btn').forEach(btn => {
-            btn.addEventListener('click', async (event) => {
-                const row = (event.target as HTMLElement).closest('tr');
-                const id = Number(row?.getAttribute('data-id'));
-                
-                if (confirm('确定要删除这条记录吗？')) {
-                    try {
-                        const success = await databaseService.deleteEntry(id);
-                        if (success) {
-                            this.log(`成功删除ID为 ${id} 的记录`);
-                            await this.loadEntries();
-                        } else {
-                            this.log(`删除ID为 ${id} 的记录失败`, 'error');
-                        }
-                    } catch (error) {
-                        this.log(`删除失败: ${(error as Error).message}`, 'error');
-                    }
                 }
             });
         });
     }
 
     private showEntryDetails(entry: TranslationEntry): void {
-        // 创建模态框
         const modal = document.createElement('div');
         modal.className = 'modal';
+        
+        // 添加所有字段
+        const fields = [
+            { key: 'Chinese', label: '中文' },
+            { key: 'English', label: '英文' },
+            { key: 'Japanese', label: '日文' },
+            { key: 'Korean', label: '韩文' },
+            { key: 'Spanish', label: '西班牙文' },
+            { key: 'French', label: '法文' },
+            { key: 'German', label: '德文' },
+            { key: 'Russian', label: '俄文' },
+            { key: 'Thai', label: '泰文' },
+            { key: 'Italian', label: '意大利文' },
+            { key: 'Indonesian', label: '印尼文' },
+            { key: 'Portuguese', label: '葡萄牙文' }
+        ];
         
         let content = `
             <div class="modal-content">
                 <span class="close">&times;</span>
-                <h2>条目详情 (ID: ${entry.id})</h2>
+                <h2>查看翻译条目</h2>
                 <div class="entry-details">
         `;
         
-        // 添加所有语言的详情
-        const languages = [
-            { code: 'Chinese', name: '中文' },
-            { code: 'English', name: '英语' },
-            { code: 'Japanese', name: '日语' },
-            { code: 'Korean', name: '韩语' },
-            { code: 'Spanish', name: '西班牙语' },
-            { code: 'French', name: '法语' },
-            { code: 'German', name: '德语' },
-            { code: 'Russian', name: '俄语' },
-            { code: 'Thai', name: '泰语' },
-            { code: 'Italian', name: '意大利语' },
-            { code: 'Indonesian', name: '印尼语' },
-            { code: 'Portuguese', name: '葡萄牙语' }
-        ];
-        
-        languages.forEach(lang => {
+        fields.forEach(field => {
+            const value = entry[field.key as keyof TranslationEntry];
             content += `
-                <div class="detail-item">
-                    <div class="detail-label">${lang.name}:</div>
-                    <div class="detail-value">${this.escapeHtml(entry[lang.code as keyof TranslationEntry] as string || '')}</div>
+                <div class="entry-field">
+                    <label>${field.label}:</label>
+                    <div class="field-value">${this.escapeHtml(value?.toString() || '')}</div>
                 </div>
             `;
         });
@@ -353,61 +314,58 @@ class KnowledgeBaseManager {
         modal.innerHTML = content;
         document.body.appendChild(modal);
         
-        // 关闭模态框
-        const closeBtn = modal.querySelector('.close') as HTMLElement;
-        closeBtn.addEventListener('click', () => {
-            document.body.removeChild(modal);
-        });
-        
-        // 点击模态框外部关闭
-        window.addEventListener('click', (event) => {
-            if (event.target === modal) {
+        // 添加关闭按钮事件
+        const closeBtn = modal.querySelector('.close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
                 document.body.removeChild(modal);
-            }
-        });
+            });
+        }
     }
 
     private showEditEntryForm(entry: TranslationEntry): void {
-        // 创建模态框
         const modal = document.createElement('div');
         modal.className = 'modal';
+        
+        // 添加所有可编辑字段
+        const fields = [
+            { key: 'Chinese', label: '中文' },
+            { key: 'English', label: '英文' },
+            { key: 'Japanese', label: '日文' },
+            { key: 'Korean', label: '韩文' },
+            { key: 'Spanish', label: '西班牙文' },
+            { key: 'French', label: '法文' },
+            { key: 'German', label: '德文' },
+            { key: 'Russian', label: '俄文' },
+            { key: 'Thai', label: '泰文' },
+            { key: 'Italian', label: '意大利文' },
+            { key: 'Indonesian', label: '印尼文' },
+            { key: 'Portuguese', label: '葡萄牙文' }
+        ];
         
         let content = `
             <div class="modal-content">
                 <span class="close">&times;</span>
-                <h2>编辑条目 (ID: ${entry.id})</h2>
+                <h2>编辑翻译条目</h2>
                 <form id="editEntryForm">
+                    <input type="hidden" id="entryChinese" value="${entry.Chinese}">
         `;
         
-        // 添加所有语言的输入框
-        const languages = [
-            { code: 'Chinese', name: '中文' },
-            { code: 'English', name: '英语' },
-            { code: 'Japanese', name: '日语' },
-            { code: 'Korean', name: '韩语' },
-            { code: 'Spanish', name: '西班牙语' },
-            { code: 'French', name: '法语' },
-            { code: 'German', name: '德语' },
-            { code: 'Russian', name: '俄语' },
-            { code: 'Thai', name: '泰语' },
-            { code: 'Italian', name: '意大利语' },
-            { code: 'Indonesian', name: '印尼语' },
-            { code: 'Portuguese', name: '葡萄牙语' }
-        ];
-        
-        languages.forEach(lang => {
+        // 添加所有可编辑字段
+        fields.forEach(field => {
+            const value = entry[field.key as keyof TranslationEntry];
             content += `
                 <div class="form-group">
-                    <label for="${lang.code}">${lang.name}:</label>
-                    <textarea id="${lang.code}" name="${lang.code}" rows="2">${this.escapeHtml(entry[lang.code as keyof TranslationEntry] as string || '')}</textarea>
+                    <label for="${field.key}">${field.label}:</label>
+                    <textarea id="${field.key}" class="form-control" rows="2">${this.escapeHtml(value?.toString() || '')}</textarea>
                 </div>
             `;
         });
         
         content += `
-                    <div class="form-actions">
+                    <div class="form-group">
                         <button type="submit" class="btn">保存</button>
-                        <button type="button" class="btn btn-cancel">取消</button>
+                        <button type="button" class="btn cancel-btn">取消</button>
                     </div>
                 </form>
             </div>
@@ -416,92 +374,91 @@ class KnowledgeBaseManager {
         modal.innerHTML = content;
         document.body.appendChild(modal);
         
-        // 关闭模态框
-        const closeBtn = modal.querySelector('.close') as HTMLElement;
-        closeBtn.addEventListener('click', () => {
-            document.body.removeChild(modal);
-        });
+        // 添加关闭按钮事件
+        const closeBtn = modal.querySelector('.close');
+        const cancelBtn = modal.querySelector('.cancel-btn');
         
-        // 取消按钮
-        const cancelBtn = modal.querySelector('.btn-cancel') as HTMLElement;
-        cancelBtn.addEventListener('click', () => {
+        const closeModal = () => {
             document.body.removeChild(modal);
-        });
+        };
         
-        // 提交表单
-        const form = document.getElementById('editEntryForm') as HTMLFormElement;
-        form.addEventListener('submit', async (event) => {
-            event.preventDefault();
+        if (closeBtn) {
+            closeBtn.addEventListener('click', closeModal);
+        }
+        
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', closeModal);
+        }
+        
+        // 添加表单提交事件
+        const form = modal.querySelector('#editEntryForm') as HTMLFormElement;
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
             
+            const entryChinese = (document.getElementById('entryChinese') as HTMLInputElement).value;
             const updatedEntry: Partial<TranslationEntry> = {};
-            languages.forEach(lang => {
-                const textarea = document.getElementById(lang.code) as HTMLTextAreaElement;
-                updatedEntry[lang.code as keyof TranslationEntry] = textarea.value as any;
+            
+            // 收集表单数据
+            fields.forEach(field => {
+                const input = document.getElementById(field.key) as HTMLTextAreaElement;
+                (updatedEntry as any)[field.key] = input.value;
             });
             
             try {
-                const success = await databaseService.updateEntry(entry.id!, updatedEntry);
-                if (success) {
-                    this.log(`成功更新ID为 ${entry.id} 的记录`);
-                    document.body.removeChild(modal);
-                    await this.loadEntries();
-                } else {
-                    this.log(`更新ID为 ${entry.id} 的记录失败`, 'error');
-                }
+                // 使用API服务更新条目
+                await apiService.updateEntry(entryChinese, updatedEntry);
+                this.log('条目更新成功');
+                document.body.removeChild(modal);
+                
+                // 刷新数据
+                await this.loadEntries();
             } catch (error) {
                 this.log(`更新失败: ${(error as Error).message}`, 'error');
-            }
-        });
-        
-        // 点击模态框外部关闭
-        window.addEventListener('click', (event) => {
-            if (event.target === modal) {
-                document.body.removeChild(modal);
             }
         });
     }
 
     private showAddEntryForm(): void {
-        // 创建模态框
         const modal = document.createElement('div');
         modal.className = 'modal';
+        
+        // 添加所有可编辑字段
+        const fields = [
+            { key: 'Chinese', label: '中文' },
+            { key: 'English', label: '英文' },
+            { key: 'Japanese', label: '日文' },
+            { key: 'Korean', label: '韩文' },
+            { key: 'Spanish', label: '西班牙文' },
+            { key: 'French', label: '法文' },
+            { key: 'German', label: '德文' },
+            { key: 'Russian', label: '俄文' },
+            { key: 'Thai', label: '泰文' },
+            { key: 'Italian', label: '意大利文' },
+            { key: 'Indonesian', label: '印尼文' },
+            { key: 'Portuguese', label: '葡萄牙文' }
+        ];
         
         let content = `
             <div class="modal-content">
                 <span class="close">&times;</span>
-                <h2>添加新条目</h2>
+                <h2>添加翻译条目</h2>
                 <form id="addEntryForm">
         `;
         
-        // 添加所有语言的输入框
-        const languages = [
-            { code: 'Chinese', name: '中文' },
-            { code: 'English', name: '英语' },
-            { code: 'Japanese', name: '日语' },
-            { code: 'Korean', name: '韩语' },
-            { code: 'Spanish', name: '西班牙语' },
-            { code: 'French', name: '法语' },
-            { code: 'German', name: '德语' },
-            { code: 'Russian', name: '俄语' },
-            { code: 'Thai', name: '泰语' },
-            { code: 'Italian', name: '意大利语' },
-            { code: 'Indonesian', name: '印尼语' },
-            { code: 'Portuguese', name: '葡萄牙语' }
-        ];
-        
-        languages.forEach(lang => {
+        // 添加所有可编辑字段
+        fields.forEach(field => {
             content += `
                 <div class="form-group">
-                    <label for="${lang.code}">${lang.name}:</label>
-                    <textarea id="${lang.code}" name="${lang.code}" rows="2"></textarea>
+                    <label for="${field.key}">${field.label}:</label>
+                    <textarea id="${field.key}" class="form-control" rows="2"></textarea>
                 </div>
             `;
         });
         
         content += `
-                    <div class="form-actions">
+                    <div class="form-group">
                         <button type="submit" class="btn">保存</button>
-                        <button type="button" class="btn btn-cancel">取消</button>
+                        <button type="button" class="btn cancel-btn">取消</button>
                     </div>
                 </form>
             </div>
@@ -510,88 +467,82 @@ class KnowledgeBaseManager {
         modal.innerHTML = content;
         document.body.appendChild(modal);
         
-        // 关闭模态框
-        const closeBtn = modal.querySelector('.close') as HTMLElement;
-        closeBtn.addEventListener('click', () => {
-            document.body.removeChild(modal);
-        });
+        // 添加关闭按钮事件
+        const closeBtn = modal.querySelector('.close');
+        const cancelBtn = modal.querySelector('.cancel-btn');
         
-        // 取消按钮
-        const cancelBtn = modal.querySelector('.btn-cancel') as HTMLElement;
-        cancelBtn.addEventListener('click', () => {
+        const closeModal = () => {
             document.body.removeChild(modal);
-        });
+        };
         
-        // 提交表单
-        const form = document.getElementById('addEntryForm') as HTMLFormElement;
-        form.addEventListener('submit', async (event) => {
-            event.preventDefault();
+        if (closeBtn) {
+            closeBtn.addEventListener('click', closeModal);
+        }
+        
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', closeModal);
+        }
+        
+        // 添加表单提交事件
+        const form = modal.querySelector('#addEntryForm') as HTMLFormElement;
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
             
-            const newEntry: any = {};
-            languages.forEach(lang => {
-                const textarea = document.getElementById(lang.code) as HTMLTextAreaElement;
-                newEntry[lang.code] = textarea.value;
+            const newEntry: Partial<TranslationEntry> = {};
+            
+            // 收集表单数据
+            fields.forEach(field => {
+                const input = document.getElementById(field.key) as HTMLTextAreaElement;
+                (newEntry as any)[field.key] = input.value;
             });
             
             try {
-                const id = await databaseService.addEntry(newEntry as TranslationEntry);
-                this.log(`成功添加新记录，ID: ${id}`);
+                // 使用API服务添加条目
+                await apiService.addEntry(newEntry);
+                this.log('条目添加成功');
                 document.body.removeChild(modal);
+                
+                // 刷新数据
                 await this.loadEntries();
             } catch (error) {
                 this.log(`添加失败: ${(error as Error).message}`, 'error');
             }
         });
-        
-        // 点击模态框外部关闭
-        window.addEventListener('click', (event) => {
-            if (event.target === modal) {
-                document.body.removeChild(modal);
-            }
-        });
     }
 
-    private getSelectedEntryIds(): number[] {
-        const selectedIds: number[] = [];
+    private getSelectedEntryIds(): string[] {
+        const selectedIds: string[] = [];
         const checkboxes = document.querySelectorAll('.entry-checkbox:checked') as NodeListOf<HTMLInputElement>;
         
         checkboxes.forEach(checkbox => {
-            const row = checkbox.closest('tr');
-            if (row) {
-                const id = Number(row.getAttribute('data-id'));
-                if (!isNaN(id)) {
-                    selectedIds.push(id);
-                }
+            const chinese = checkbox.getAttribute('data-id') || '';
+            if (chinese) {
+                selectedIds.push(chinese);
             }
         });
         
         return selectedIds;
     }
 
-    private log(message: string, type: 'info' | 'error' | 'warning' = 'info'): void {
-        const timestamp = new Date().toLocaleTimeString();
-        const logItem = document.createElement('div');
-        logItem.className = `log-item log-${type}`;
-        logItem.innerHTML = `<span class="log-time">[${timestamp}]</span> ${message}`;
-        this.logOutput.appendChild(logItem);
-        this.logOutput.scrollTop = this.logOutput.scrollHeight;
-        
-        console.log(`[${type.toUpperCase()}] ${message}`);
-    }
+    private log(message: string, type: 'info' | 'error' = 'info'): void {
+        const logOutput = document.getElementById('logOutput');
+        if (!logOutput) return;
 
-    private showProgress(percent: number): void {
-        this.progressFill.style.width = `${percent}%`;
-        this.progressText.textContent = `${percent}%`;
+        const logEntry = document.createElement('div');
+        logEntry.className = `log-entry ${type}`;
+        logEntry.textContent = message;
+        logOutput.appendChild(logEntry);
+        logOutput.scrollTop = logOutput.scrollHeight;
     }
 
     private escapeHtml(text: string): string {
         if (!text) return '';
         return text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
 }
 

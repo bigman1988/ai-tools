@@ -35,8 +35,9 @@ module.exports = {
             "vm": require.resolve("vm-browserify"),
             "timers": require.resolve("timers-browserify"),
             "assert": require.resolve("assert/"),
-            "net": false,
-            "tls": false,
+            "net": require.resolve("net-browserify"),
+            "tls": require.resolve("tls-browserify"),
+            "async_hooks": false,
             "fs": false,
             "path": false,
             "child_process": false
@@ -64,7 +65,12 @@ module.exports = {
         new webpack.ProvidePlugin({
             process: 'process/browser',
             Buffer: ['buffer', 'Buffer']
-        })
+        }),
+        // 添加空的async_hooks模块
+        new webpack.NormalModuleReplacementPlugin(
+            /async_hooks/,
+            require.resolve('./src/polyfills/async-hooks-polyfill.js')
+        )
     ],
     optimization: {
         splitChunks: {
