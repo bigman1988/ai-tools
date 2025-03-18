@@ -51,7 +51,6 @@ export class KnowledgeBaseTableRenderer {
                             <th>意大利文</th>
                             <th>印尼文</th>
                             <th>葡萄牙文</th>
-                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="entriesTableBody">
@@ -69,23 +68,18 @@ export class KnowledgeBaseTableRenderer {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td class="checkbox-cell"><input type="checkbox" class="entry-checkbox" data-id="${entry.Chinese}"></td>
-                <td>${escapeHtml(entry.Chinese || '')}</td>
-                <td>${escapeHtml(entry.English || '')}</td>
-                <td>${escapeHtml(entry.Japanese || '')}</td>
-                <td>${escapeHtml(entry.Korean || '')}</td>
-                <td>${escapeHtml(entry.Spanish || '')}</td>
-                <td>${escapeHtml(entry.French || '')}</td>
-                <td>${escapeHtml(entry.German || '')}</td>
-                <td>${escapeHtml(entry.Russian || '')}</td>
-                <td>${escapeHtml(entry.Thai || '')}</td>
-                <td>${escapeHtml(entry.Italian || '')}</td>
-                <td>${escapeHtml(entry.Indonesian || '')}</td>
-                <td>${escapeHtml(entry.Portuguese || '')}</td>
-                <td>
-                    <button class="btn-small view-btn" data-id="${entry.Chinese}">查看</button>
-                    <button class="btn-small edit-btn" data-id="${entry.Chinese}">编辑</button>
-                    <button class="btn-small delete-btn" data-id="${entry.Chinese}">删除</button>
-                </td>
+                <td class="content-cell">${escapeHtml(entry.Chinese || '')}</td>
+                <td class="content-cell">${escapeHtml(entry.English || '')}</td>
+                <td class="content-cell">${escapeHtml(entry.Japanese || '')}</td>
+                <td class="content-cell">${escapeHtml(entry.Korean || '')}</td>
+                <td class="content-cell">${escapeHtml(entry.Spanish || '')}</td>
+                <td class="content-cell">${escapeHtml(entry.French || '')}</td>
+                <td class="content-cell">${escapeHtml(entry.German || '')}</td>
+                <td class="content-cell">${escapeHtml(entry.Russian || '')}</td>
+                <td class="content-cell">${escapeHtml(entry.Thai || '')}</td>
+                <td class="content-cell">${escapeHtml(entry.Italian || '')}</td>
+                <td class="content-cell">${escapeHtml(entry.Indonesian || '')}</td>
+                <td class="content-cell">${escapeHtml(entry.Portuguese || '')}</td>
             `;
             tableBody.appendChild(tr);
         });
@@ -108,36 +102,18 @@ export class KnowledgeBaseTableRenderer {
             });
         }
 
-        // 添加查看按钮事件监听器
-        const viewButtons = document.querySelectorAll('.view-btn') as NodeListOf<HTMLButtonElement>;
-        viewButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                const chinese = button.getAttribute('data-id') || '';
-                const entry = this.currentEntries.find(e => e.Chinese === chinese);
-                if (entry) {
-                    this.modals.showEntryDetails(entry);
+        // 为每行添加双击事件，显示详情
+        const tableRows = document.querySelectorAll('#entriesTableBody tr');
+        tableRows.forEach(row => {
+            row.addEventListener('dblclick', () => {
+                const checkbox = row.querySelector('.entry-checkbox') as HTMLInputElement;
+                if (checkbox) {
+                    const chinese = checkbox.getAttribute('data-id') || '';
+                    const entry = this.currentEntries.find(e => e.Chinese === chinese);
+                    if (entry) {
+                        this.modals.showEntryDetails(entry);
+                    }
                 }
-            });
-        });
-
-        // 添加编辑按钮事件监听器
-        const editButtons = document.querySelectorAll('.edit-btn') as NodeListOf<HTMLButtonElement>;
-        editButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                const chinese = button.getAttribute('data-id') || '';
-                const entry = this.currentEntries.find(e => e.Chinese === chinese);
-                if (entry) {
-                    this.modals.showEditEntryForm(entry);
-                }
-            });
-        });
-
-        // 添加删除按钮事件监听器
-        const deleteButtons = document.querySelectorAll('.delete-btn') as NodeListOf<HTMLButtonElement>;
-        deleteButtons.forEach(button => {
-            button.addEventListener('click', async () => {
-                const chinese = button.getAttribute('data-id') || '';
-                await this.deleteEntryCallback(chinese);
             });
         });
     }

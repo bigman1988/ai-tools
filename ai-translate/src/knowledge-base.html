@@ -100,9 +100,9 @@
             padding: 12px;
             text-align: left;
             border: 1px solid var(--border-color);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            white-space: normal;
+            overflow: visible;
+            word-break: break-word;
         }
 
         .kb-table th {
@@ -115,6 +115,15 @@
 
         .kb-table tbody tr:hover {
             background: #f0f7ff;
+            cursor: pointer;
+        }
+
+        .content-cell {
+            min-width: 150px;
+            max-width: 300px;
+            vertical-align: top;
+            line-height: 1.5;
+            white-space: pre-wrap;
         }
 
         .checkbox-cell {
@@ -167,6 +176,64 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #555;
         }
+
+        .file-input-container {
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .file-name {
+            margin: 10px 0;
+            padding: 5px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            min-height: 20px;
+            word-break: break-all;
+        }
+        
+        .button-group {
+            margin-top: 10px;
+        }
+        
+        .action-buttons-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .progress-wrapper {
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            margin: 10px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background-color: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .progress-text {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+            font-size: 12px;
+            text-shadow: 0 0 2px rgba(0,0,0,0.5);
+        }
+        
+        .progress-details {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
     </style>
     <script defer src="knowledgeBase.bundle.js"></script>
 </head>
@@ -192,13 +259,11 @@
                         <button id="importBtn" class="btn">导入知识库</button>
                     </div>
                     <div class="progress-wrapper">
-                        <div class="progress-container">
-                            <div class="progress-fill"></div>
-                            <div class="progress-text">0%</div>
-                        </div>
-                        <div class="progress-details" style="display: none;">
-                            已完成: 0 / 0 条目
-                        </div>
+                        <div id="progressFill" class="progress-fill"></div>
+                        <div id="progressText" class="progress-text">0%</div>
+                    </div>
+                    <div id="progressDetails" class="progress-details">
+                        已完成: 0 / 0 条目
                     </div>
                 </div>
             </div>

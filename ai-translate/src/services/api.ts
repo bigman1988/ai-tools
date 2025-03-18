@@ -50,7 +50,8 @@ class ApiService {
             });
 
             if (!response.ok) {
-                throw new Error(`添加条目失败: ${response.status}`);
+                const errorData = await response.json().catch(() => ({ error: '未知错误' }));
+                throw new Error(`添加条目失败: ${response.status}, 详情: ${errorData.details || errorData.error || '未知错误'}`);
             }
 
             const result = await response.json();

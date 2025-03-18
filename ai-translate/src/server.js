@@ -100,28 +100,77 @@ app.post('/api/entries', async (req, res) => {
     try {
         const entry = req.body;
         
-        const [result] = await pool.execute(
-            'INSERT INTO `translate-cn` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [
-                entry.Chinese || '',
-                entry.English || '',
-                entry.Japanese || '',
-                entry.Korean || '',
-                entry.Spanish || '',
-                entry.French || '',
-                entry.German || '',
-                entry.Russian || '',
-                entry.Thai || '',
-                entry.Italian || '',
-                entry.Indonesian || '',
-                entry.Portuguese || ''
-            ]
+        // 检查必要字段
+        if (!entry.Chinese || entry.Chinese.trim() === '') {
+            return res.status(400).json({ 
+                error: '添加条目失败', 
+                details: '中文字段不能为空' 
+            });
+        }
+        
+        // 检查是否已存在相同的中文条目
+        const [existingEntries] = await pool.execute(
+            'SELECT Chinese FROM `translate-cn` WHERE Chinese = ?',
+            [entry.Chinese]
         );
         
-        res.json({ success: true });
+        if (existingEntries.length > 0) {
+            return res.status(409).json({ 
+                error: '添加条目失败', 
+                details: `条目已存在: "${entry.Chinese}"` 
+            });
+        }
+        
+        // 插入新条目
+        try {
+            const [result] = await pool.execute(
+                'INSERT INTO `translate-cn` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                    entry.Chinese || '',
+                    entry.English || '',
+                    entry.Japanese || '',
+                    entry.Korean || '',
+                    entry.Spanish || '',
+                    entry.French || '',
+                    entry.German || '',
+                    entry.Russian || '',
+                    entry.Thai || '',
+                    entry.Italian || '',
+                    entry.Indonesian || '',
+                    entry.Portuguese || ''
+                ]
+            );
+            
+            console.log('添加条目成功:', entry.Chinese);
+            res.json({ success: true });
+        } catch (dbError) {
+            console.error('数据库操作失败:', dbError);
+            // 提供更详细的数据库错误信息
+            let errorDetails = '数据库操作失败';
+            if (dbError.code) {
+                switch (dbError.code) {
+                    case 'ER_DUP_ENTRY':
+                        errorDetails = `条目已存在: "${entry.Chinese}"`;
+                        break;
+                    case 'ER_DATA_TOO_LONG':
+                        errorDetails = '数据过长，超出字段限制';
+                        break;
+                    default:
+                        errorDetails = `${dbError.code}: ${dbError.message}`;
+                }
+            }
+            
+            res.status(500).json({ 
+                error: '添加条目失败', 
+                details: errorDetails 
+            });
+        }
     } catch (error) {
         console.error('添加条目失败:', error);
-        res.status(500).json({ error: '添加条目失败', details: error.message });
+        res.status(500).json({ 
+            error: '添加条目失败', 
+            details: error.message || '未知错误' 
+        });
     }
 });
 

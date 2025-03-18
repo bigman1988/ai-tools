@@ -107,79 +107,118 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
             if (files && files.length > 0) {
                 const file = files[0];
                 this.fileName.textContent = file.name;
-                this.uploadBtn.style.display = 'inline-block';
+                this.actionButtons.style.display = 'block';
             }
         });
 
-        // 上传按钮事件
+        // 上传按钮事件 - 触发文件选择对话框
         this.uploadBtn.addEventListener('click', () => {
-            const files = this.fileInput.files;
-            if (files && files.length > 0) {
-                const file = files[0];
-                this.processExcelFile(file);
-            } else {
-                this.log('请先选择文件', 'error');
-            }
+            this.fileInput.click(); // 点击上传按钮时触发文件选择对话框
         });
 
         // 导入按钮事件
         this.importBtn.addEventListener('click', async () => {
             try {
+                const files = this.fileInput.files;
+                if (!files || files.length === 0) {
+                    this.log('请先选择文件', 'error');
+                    return;
+                }
+                
+                const file = files[0];
+                
+                // 先处理Excel文件
+                this.log(`开始处理Excel文件: ${file.name}`);
+                this.processExcelFile(file);
+                
                 // 显示进度条
                 this.progressFill.style.width = '0%';
                 this.progressText.textContent = '0%';
                 this.progressDetails.textContent = '准备导入...';
-                this.actionButtons.style.display = 'none';
+                this.progressDetails.style.display = 'block';
                 
                 // 获取当前选中的源语言
                 this.selectedSourceLang = this.sourceLang.value;
                 
-                // 获取所有条目
-                const entries = this.currentEntries;
-                
-                if (entries.length === 0) {
-                    this.log('没有数据可导入', 'error');
-                    this.actionButtons.style.display = 'flex';
-                    return;
-                }
-                
-                // 开始导入
-                this.log(`开始导入 ${entries.length} 条记录`);
-                
-                // 批量导入
-                const batchSize = 10;
-                let successCount = 0;
-                let failCount = 0;
-                
-                for (let i = 0; i < entries.length; i += batchSize) {
-                    const batch = entries.slice(i, i + batchSize);
+                // 等待Excel处理完成
+                setTimeout(() => {
+                    // 获取所有条目
+                    const entries = this.currentEntries;
                     
-                    try {
-                        await Promise.all(batch.map(entry => apiService.addEntry(entry)));
-                        successCount += batch.length;
-                    } catch (error) {
-                        failCount += batch.length;
-                        this.log(`批量导入失败: ${(error as Error).message}`, 'error');
+                    if (entries.length === 0) {
+                        this.log('没有数据可导入', 'error');
+                        return;
                     }
                     
-                    // 更新进度
-                    const progress = Math.round((i + batch.length) / entries.length * 100);
-                    this.progressFill.style.width = `${progress}%`;
-                    this.progressText.textContent = `${progress}%`;
-                    this.progressDetails.textContent = `已处理 ${i + batch.length} / ${entries.length} 条记录`;
-                }
+                    // 开始导入
+                    this.log(`开始导入 ${entries.length} 条记录`);
+                    
+                    // 批量导入
+                    const batchSize = 1; 
+                    let successCount = 0;
+                    let failCount = 0;
+                    const failedEntries: { entry: TranslationEntry, error: string }[] = [];
+                    
+                    const importBatch = async (startIndex: number) => {
+                        if (startIndex >= entries.length) {
+                            // 导入完成
+                            this.log(`导入完成，成功: ${successCount}，失败: ${failCount}`);
+                            
+                            // 显示失败的条目详情
+                            if (failCount > 0) {
+                                this.log(`失败条目详情：`, 'error');
+                                failedEntries.forEach((item, index) => {
+                                    this.log(`${index + 1}. 条目: "${item.entry.Chinese}" 失败原因: ${item.error}`, 'error');
+                                });
+                            }
+                            
+                            // 刷新数据
+                            await this.loadEntries();
+                            return;
+                        }
+                        
+                        const endIndex = Math.min(startIndex + batchSize, entries.length);
+                        const batch = entries.slice(startIndex, endIndex);
+                        
+                        try {
+                            // 逐条处理，以便记录每条的错误
+                            for (const entry of batch) {
+                                try {
+                                    await apiService.addEntry(entry);
+                                    successCount++;
+                                } catch (error) {
+                                    failCount++;
+                                    const errorMessage = (error as Error).message || '未知错误';
+                                    failedEntries.push({ entry, error: errorMessage });
+                                    this.log(`导入失败: "${entry.Chinese}", 原因: ${errorMessage}`, 'error');
+                                }
+                            }
+                        } catch (error) {
+                            // 批处理整体失败的情况
+                            failCount += batch.length;
+                            const errorMessage = (error as Error).message || '未知错误';
+                            this.log(`批量导入失败: ${errorMessage}`, 'error');
+                            batch.forEach(entry => {
+                                failedEntries.push({ entry, error: errorMessage });
+                            });
+                        }
+                        
+                        // 更新进度
+                        const progress = Math.round(endIndex / entries.length * 100);
+                        this.progressFill.style.width = `${progress}%`;
+                        this.progressText.textContent = `${progress}%`;
+                        this.progressDetails.textContent = `已处理 ${endIndex} / ${entries.length} 条记录，成功: ${successCount}，失败: ${failCount}`;
+                        
+                        // 处理下一批
+                        setTimeout(() => importBatch(endIndex), 0);
+                    };
+                    
+                    // 开始导入第一批
+                    importBatch(0);
+                }, 500); // 给Excel处理一些时间
                 
-                // 导入完成
-                this.log(`导入完成，成功: ${successCount}，失败: ${failCount}`);
-                
-                // 刷新数据
-                await this.loadEntries();
-                
-                // 隐藏进度条
-                this.actionButtons.style.display = 'flex';
             } catch (error) {
                 this.log(`导入失败: ${(error as Error).message}`, 'error');
-                this.actionButtons.style.display = 'flex';
             }
         });
 

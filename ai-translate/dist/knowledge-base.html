@@ -159,4 +159,62 @@
 
         ::-webkit-scrollbar-thumb:hover {
             background: #555;
-        }</style><script defer="defer" src="knowledgeBase.bundle.js"></script><script defer="defer" src="vendor.bundle.js"></script><script defer="defer" src="knowledgeBase.bundle.js"></script></head><body><div class="app-container"><div class="sidebar"><h2>翻译知识库管理</h2><div class="source-lang-selector"><label for="sourceLang">源语言：</label> <select id="sourceLang" class="select-input"><option value="zh-CN">简体中文</option><option value="en">英语</option></select></div><div class="file-input-container"><input type="file" id="fileInput" accept=".xlsx,.xls,.json" style="display: none;"/><div id="fileName" class="file-name"></div><div class="button-group"><button class="btn" id="uploadBtn">选择文件</button></div><div id="actionButtons" class="button-group" style="display: none;"><div class="action-buttons-row"><button id="importBtn" class="btn">导入知识库</button></div><div class="progress-wrapper"><div class="progress-container"><div class="progress-fill"></div><div class="progress-text">0%</div></div><div class="progress-details" style="display: none;">已完成: 0 / 0 条目</div></div></div></div><div class="log-container"><h3>操作日志</h3><div id="logOutput" class="log-output"></div></div></div><div class="main-content"><div class="knowledge-base-container"><div class="search-container"><input id="searchInput" placeholder="搜索知识库内容..." class="search-input"> <button id="searchBtn" class="btn">搜索</button> <button id="addEntryBtn" class="btn">添加条目</button> <button id="deleteSelectedBtn" class="btn">删除所选</button></div><div id="kbTableOutput" class="kb-table"></div></div></div></div></body></html>
+        }
+
+        .file-input-container {
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .file-name {
+            margin: 10px 0;
+            padding: 5px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            min-height: 20px;
+            word-break: break-all;
+        }
+        
+        .button-group {
+            margin-top: 10px;
+        }
+        
+        .action-buttons-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .progress-wrapper {
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            margin: 10px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background-color: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .progress-text {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+            font-size: 12px;
+            text-shadow: 0 0 2px rgba(0,0,0,0.5);
+        }
+        
+        .progress-details {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }</style><script defer="defer" src="knowledgeBase.bundle.js"></script><script defer="defer" src="vendor.bundle.js"></script><script defer="defer" src="knowledgeBase.bundle.js"></script></head><body><div class="app-container"><div class="sidebar"><h2>翻译知识库管理</h2><div class="source-lang-selector"><label for="sourceLang">源语言：</label> <select id="sourceLang" class="select-input"><option value="zh-CN">简体中文</option><option value="en">英语</option></select></div><div class="file-input-container"><input type="file" id="fileInput" accept=".xlsx,.xls,.json" style="display: none;"/><div id="fileName" class="file-name"></div><div class="button-group"><button class="btn" id="uploadBtn">选择文件</button></div><div id="actionButtons" class="button-group" style="display: none;"><div class="action-buttons-row"><button id="importBtn" class="btn">导入知识库</button></div><div class="progress-wrapper"><div id="progressFill" class="progress-fill"></div><div id="progressText" class="progress-text">0%</div></div><div id="progressDetails" class="progress-details">已完成: 0 / 0 条目</div></div></div><div class="log-container"><h3>操作日志</h3><div id="logOutput" class="log-output"></div></div></div><div class="main-content"><div class="knowledge-base-container"><div class="search-container"><input id="searchInput" placeholder="搜索知识库内容..." class="search-input"> <button id="searchBtn" class="btn">搜索</button> <button id="addEntryBtn" class="btn">添加条目</button> <button id="deleteSelectedBtn" class="btn">删除所选</button></div><div id="kbTableOutput" class="kb-table"></div></div></div></div></body></html>
