@@ -38,8 +38,14 @@ export class KnowledgeBaseManager {
         // 初始化API服务
         this.initializeDatabase();
         
-        // 初始化事件监听器
-        this.initializeEventListeners();
+        // 检查是否已经初始化过，避免重复注册事件监听器
+        if (!window.knowledgeBaseManagerInstance) {
+            // 初始化事件监听器
+            this.initializeEventListeners();
+            console.log('初始化事件监听器');
+        } else {
+            console.log('检测到已存在实例，跳过事件监听器初始化');
+        }
     }
 
     private initializeDOMElements(): void {
@@ -148,6 +154,7 @@ export class KnowledgeBaseManager {
                 try {
                     let deletedCount = 0;
                     for (const id of selectedIds) {
+                        // 不需要再次使用encodeURIComponent，API服务中已经处理了
                         const success = await apiService.deleteEntry(id.toString());
                         if (success) deletedCount++;
                     }
@@ -228,6 +235,7 @@ export class KnowledgeBaseManager {
                 <td>
                     <button class="btn-small view-btn" data-id="${entry.Chinese}">查看</button>
                     <button class="btn-small edit-btn" data-id="${entry.Chinese}">编辑</button>
+                    <button class="btn-small delete-btn" data-id="${entry.Chinese}">删除</button>
                 </td>
             `;
             tableBody.appendChild(tr);
@@ -267,6 +275,34 @@ export class KnowledgeBaseManager {
                 }
             });
         });
+
+        // 添加删除按钮事件监听器
+        const deleteButtons = document.querySelectorAll('.delete-btn') as NodeListOf<HTMLButtonElement>;
+        deleteButtons.forEach(button => {
+            button.addEventListener('click', async () => {
+                const chinese = button.getAttribute('data-id') || '';
+                await this.deleteEntry(chinese);
+            });
+        });
+    }
+
+    // 添加单独的删除条目方法
+    private async deleteEntry(chinese: string): Promise<void> {
+        try {
+            const confirmDelete = confirm(`确定要删除该条目吗？`);
+            if (!confirmDelete) return;
+
+            // 不需要再次使用encodeURIComponent，API服务中已经处理了
+            const success = await apiService.deleteEntry(chinese);
+            if (success) {
+                this.log('删除条目成功');
+                await this.loadEntries();
+            } else {
+                this.log('删除条目失败', 'error');
+            }
+        } catch (error) {
+            this.log(`删除条目失败: ${(error as Error).message}`, 'error');
+        }
     }
 
     private showEntryDetails(entry: TranslationEntry): void {
