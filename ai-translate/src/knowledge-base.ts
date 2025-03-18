@@ -340,6 +340,11 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
                 
                 // 检查必要字段
                 if (entry.Chinese) {
+                    // 检查主键长度，如果超过100个字符则忽略
+                    if (entry.Chinese.length > 100) {
+                        this.log(`警告: 忽略过长的主键 "${entry.Chinese.substring(0, 30)}..." (${entry.Chinese.length} 字符)`, 'warning');
+                        continue;
+                    }
                     entries.push(entry as TranslationEntry);
                 }
             }
