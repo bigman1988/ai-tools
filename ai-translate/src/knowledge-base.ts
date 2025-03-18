@@ -194,14 +194,36 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
      */
     public async loadEntries(searchTerm?: string): Promise<void> {
         try {
-            const entries = await apiService.getEntries(searchTerm);
-            this.currentEntries = entries;
-            this.tableRenderer.renderTable(entries);
+            // 如果没有搜索词且内存中没有数据，则从数据库加载
+            if (!searchTerm && this.currentEntries.length === 0) {
+                const entries = await apiService.getEntries();
+                this.currentEntries = entries;
+                this.tableRenderer.renderTable(entries);
+                this.log(`加载了 ${entries.length} 条记录`);
+                return;
+            }
+            
+            // 如果有搜索词或内存中已有数据，则在内存中搜索
+            let filteredEntries = this.currentEntries;
             
             if (searchTerm) {
-                this.log(`搜索结果: ${entries.length} 条记录`);
+                const searchTermLower = searchTerm.toLowerCase();
+                filteredEntries = this.currentEntries.filter(entry => {
+                    // 在所有字段中搜索
+                    return Object.values(entry).some(value => {
+                        if (typeof value === 'string') {
+                            return value.toLowerCase().includes(searchTermLower);
+                        }
+                        return false;
+                    });
+                });
+                
+                this.tableRenderer.renderTable(filteredEntries);
+                this.log(`搜索结果: ${filteredEntries.length} 条记录`);
             } else {
-                this.log(`加载了 ${entries.length} 条记录`);
+                // 如果没有搜索词，显示所有记录
+                this.tableRenderer.renderTable(this.currentEntries);
+                this.log(`显示全部 ${this.currentEntries.length} 条记录`);
             }
         } catch (error) {
             this.log(`加载失败: ${(error as Error).message}`, 'error');
