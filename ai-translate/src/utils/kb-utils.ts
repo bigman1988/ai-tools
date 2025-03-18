@@ -31,7 +31,7 @@ export const languageFields = [
 
 // 日志记录函数
 export function createLogger(logOutput: HTMLElement) {
-    return function log(message: string, type: 'info' | 'error' = 'info'): void {
+    return function log(message: string, type: 'info' | 'warning' | 'error' = 'info'): void {
         if (!logOutput) return;
 
         const logEntry = document.createElement('div');

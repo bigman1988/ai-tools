@@ -16,5 +16,8 @@ export interface ModalConfig {
 // 知识库管理器接口
 export interface IKnowledgeBaseManager {
     loadEntries(searchTerm?: string): Promise<void>;
-    log(message: string, type: 'info' | 'error'): void;
+    /**
+     * 记录日志
+     */
+    log(message: string, type: 'info' | 'warning' | 'error'): void;
 }

@@ -36,7 +36,7 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
     private sourceLang!: HTMLSelectElement;
     
     // 日志记录函数
-    private logFunction: (message: string, type: 'info' | 'error') => void;
+    private logFunction: (message: string, type: 'info' | 'warning' | 'error') => void;
 
     constructor() {
         // 初始化所有DOM元素
@@ -141,7 +141,7 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
                 this.selectedSourceLang = this.sourceLang.value;
                 
                 // 等待Excel处理完成
-                setTimeout(() => {
+                setTimeout(async () => {
                     // 获取所有条目
                     const entries = this.currentEntries;
                     
@@ -150,19 +150,45 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
                         return;
                     }
                     
-                    // 开始导入
-                    this.log(`开始导入 ${entries.length} 条记录`);
+                    // 开始导入前，先获取现有条目进行比对
+                    this.log('获取现有条目进行比对...');
+                    const existingEntries = await apiService.getEntries();
+                    const existingChineseSet = new Set(existingEntries.map(entry => entry.Chinese));
+                    
+                    // 过滤掉已存在的条目
+                    const newEntries = entries.filter(entry => !existingChineseSet.has(entry.Chinese));
+                    const duplicateEntries = entries.filter(entry => existingChineseSet.has(entry.Chinese));
+                    
+                    if (duplicateEntries.length > 0) {
+                        this.log(`发现 ${duplicateEntries.length} 条重复条目，将被跳过`, 'warning');
+                        duplicateEntries.forEach((entry, index) => {
+                            if (index < 10) { // 只显示前10条，避免日志过长
+                                this.log(`- 重复条目: "${entry.Chinese}"`, 'warning');
+                            } else if (index === 10) {
+                                this.log(`- 以及其他 ${duplicateEntries.length - 10} 条...`, 'warning');
+                            }
+                        });
+                    }
+                    
+                    if (newEntries.length === 0) {
+                        this.log('所有条目都已存在，无需导入', 'warning');
+                        return;
+                    }
+                    
+                    // 开始导入新条目
+                    this.log(`开始导入 ${newEntries.length} 条新记录`);
                     
                     // 批量导入
-                    const batchSize = 1; 
+                    const batchSize = 1; // 改为逐条导入，以便精确记录每条记录的错误
                     let successCount = 0;
                     let failCount = 0;
                     const failedEntries: { entry: TranslationEntry, error: string }[] = [];
                     
                     const importBatch = async (startIndex: number) => {
-                        if (startIndex >= entries.length) {
+                        if (startIndex >= newEntries.length) {
                             // 导入完成
-                            this.log(`导入完成，成功: ${successCount}，失败: ${failCount}`);
+                            const totalProcessed = successCount + failCount + duplicateEntries.length;
+                            this.log(`导入完成，成功: ${successCount}，失败: ${failCount}，跳过重复: ${duplicateEntries.length}，总计: ${totalProcessed}`);
                             
                             // 显示失败的条目详情
                             if (failCount > 0) {
@@ -177,20 +203,41 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
                             return;
                         }
                         
-                        const endIndex = Math.min(startIndex + batchSize, entries.length);
-                        const batch = entries.slice(startIndex, endIndex);
+                        const endIndex = Math.min(startIndex + batchSize, newEntries.length);
+                        const batch = newEntries.slice(startIndex, endIndex);
                         
                         try {
                             // 逐条处理，以便记录每条的错误
                             for (const entry of batch) {
                                 try {
+                                    // 再次检查是否是重复条目（以防万一在导入过程中有新条目被添加）
+                                    if (existingChineseSet.has(entry.Chinese)) {
+                                        // 这是一个重复条目，记录为警告并跳过
+                                        this.log(`跳过重复条目: "${entry.Chinese}"`, 'warning');
+                                        continue;
+                                    }
+                                    
                                     await apiService.addEntry(entry);
                                     successCount++;
+                                    // 添加到已存在集合中，防止后续重复添加
+                                    existingChineseSet.add(entry.Chinese);
                                 } catch (error) {
-                                    failCount++;
                                     const errorMessage = (error as Error).message || '未知错误';
-                                    failedEntries.push({ entry, error: errorMessage });
-                                    this.log(`导入失败: "${entry.Chinese}", 原因: ${errorMessage}`, 'error');
+                                    
+                                    // 检查是否是重复条目错误
+                                    if (errorMessage.includes('409') && errorMessage.includes('条目已存在')) {
+                                        // 这是一个重复条目错误，记录为警告而不是错误
+                                        this.log(`跳过重复条目: "${entry.Chinese}"`, 'warning');
+                                        // 添加到已存在集合中
+                                        existingChineseSet.add(entry.Chinese);
+                                        // 更新重复条目计数而不是失败计数
+                                        duplicateEntries.push(entry);
+                                    } else {
+                                        // 其他类型的错误
+                                        failCount++;
+                                        failedEntries.push({ entry, error: errorMessage });
+                                        this.log(`导入失败: "${entry.Chinese}", 原因: ${errorMessage}`, 'error');
+                                    }
                                 }
                             }
                         } catch (error) {
@@ -204,10 +251,10 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
                         }
                         
                         // 更新进度
-                        const progress = Math.round(endIndex / entries.length * 100);
+                        const progress = Math.round((endIndex + duplicateEntries.length) / entries.length * 100);
                         this.progressFill.style.width = `${progress}%`;
                         this.progressText.textContent = `${progress}%`;
-                        this.progressDetails.textContent = `已处理 ${endIndex} / ${entries.length} 条记录，成功: ${successCount}，失败: ${failCount}`;
+                        this.progressDetails.textContent = `已处理 ${endIndex + duplicateEntries.length} / ${entries.length} 条记录，成功: ${successCount}，失败: ${failCount}，跳过重复: ${duplicateEntries.length}`;
                         
                         // 处理下一批
                         setTimeout(() => importBatch(endIndex), 0);
@@ -446,7 +493,7 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
     /**
      * 记录日志
      */
-    public log(message: string, type: 'info' | 'error' = 'info'): void {
+    public log(message: string, type: 'info' | 'warning' | 'error' = 'info'): void {
         this.logFunction(message, type);
     }
 }
