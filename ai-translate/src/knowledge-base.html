@@ -287,19 +287,6 @@
             border-radius: 4px;
         }
 
-        .source-lang-selector {
-            margin: 10px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .source-lang-selector label {
-            display: inline;
-            margin-bottom: 0;
-            font-weight: normal;
-        }
-
         .select-input {
             padding: 8px 12px;
             border: 1px solid var(--border-color);
@@ -366,12 +353,6 @@
     <div class="app-container">
         <div class="sidebar">
             <h2>翻译知识库管理</h2>
-            <div class="source-lang-selector">
-                <label for="sourceLang">源语言：</label>
-                <select id="sourceLang" class="select-input">
-                    <option value="zh-CN">简体中文</option>
-                </select>
-            </div>
             <div class="file-input-container">
                 <button id="uploadBtn" class="btn">从文件中批量导入</button>
                 <input type="file" id="fileInput" style="display: none;" accept=".xlsx, .xls">
