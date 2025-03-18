@@ -374,42 +374,39 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
                 // 开始导入前，先获取现有条目进行比对
                 this.log('获取现有条目进行比对...');
                 const existingEntries = await apiService.getEntries();
-                const existingChineseSet = new Set(existingEntries.map(entry => entry.Chinese));
+                const existingChineseMap = new Map();
+                existingEntries.forEach(entry => {
+                    existingChineseMap.set(entry.Chinese, entry);
+                });
                 
-                // 过滤掉已存在的条目
-                const newEntries = entries.filter(entry => !existingChineseSet.has(entry.Chinese));
-                const duplicateEntries = entries.filter(entry => existingChineseSet.has(entry.Chinese));
+                // 分类条目
+                const newEntries = entries.filter(entry => !existingChineseMap.has(entry.Chinese));
+                const duplicateEntries = entries.filter(entry => existingChineseMap.has(entry.Chinese));
                 
                 if (duplicateEntries.length > 0) {
-                    this.log(`发现 ${duplicateEntries.length} 条重复条目，将被跳过`, 'warning');
-                    duplicateEntries.forEach((entry, index) => {
-                        if (index < 10) { // 只显示前10条，避免日志过长
-                            this.log(`- 重复条目: "${entry.Chinese}"`, 'warning');
-                        } else if (index === 10) {
-                            this.log(`- 以及其他 ${duplicateEntries.length - 10} 条...`, 'warning');
-                        }
-                    });
+                    this.log(`发现 ${duplicateEntries.length} 条已存在的条目，将进行字段级别比较和更新`, 'warning');
                 }
                 
-                if (newEntries.length === 0) {
-                    this.log('所有条目都已存在，无需导入', 'warning');
+                if (newEntries.length === 0 && duplicateEntries.length === 0) {
+                    this.log('没有需要导入或更新的条目', 'warning');
                     return;
                 }
                 
-                // 开始导入新条目
-                this.log(`开始导入 ${newEntries.length} 条新记录`);
+                // 开始导入新条目和更新已存在条目
+                this.log(`开始导入 ${newEntries.length} 条新记录，更新 ${duplicateEntries.length} 条已存在记录`);
                 
                 // 批量导入
                 const batchSize = 1; // 改为逐条导入，以便精确记录每条记录的错误
                 let successCount = 0;
                 let failCount = 0;
+                let updateCount = 0;
                 const failedEntries: { entry: TranslationEntry, error: string }[] = [];
                 
                 const importBatch = async (startIndex: number) => {
-                    if (startIndex >= newEntries.length) {
+                    if (startIndex >= newEntries.length + duplicateEntries.length) {
                         // 导入完成
-                        const totalProcessed = successCount + failCount + duplicateEntries.length;
-                        this.log(`导入完成，成功: ${successCount}，失败: ${failCount}，跳过重复: ${duplicateEntries.length}，总计: ${totalProcessed}`);
+                        const totalProcessed = successCount + failCount + updateCount;
+                        this.log(`导入完成，成功: ${successCount}，失败: ${failCount}，更新: ${updateCount}，总计: ${totalProcessed}`);
                         
                         // 显示失败的条目详情
                         if (failCount > 0) {
@@ -424,24 +421,49 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
                         return;
                     }
                     
-                    const endIndex = Math.min(startIndex + batchSize, newEntries.length);
-                    const batch = newEntries.slice(startIndex, endIndex);
+                    const endIndex = Math.min(startIndex + batchSize, newEntries.length + duplicateEntries.length);
+                    const batch = startIndex < newEntries.length ? newEntries.slice(startIndex, endIndex) : duplicateEntries.slice(startIndex - newEntries.length, endIndex - newEntries.length);
                     
                     try {
                         // 逐条处理，以便记录每条的错误
                         for (const entry of batch) {
                             try {
-                                // 再次检查是否是重复条目（以防万一在导入过程中有新条目被添加）
-                                if (existingChineseSet.has(entry.Chinese)) {
-                                    // 这是一个重复条目，记录为警告并跳过
-                                    this.log(`跳过重复条目: "${entry.Chinese}"`, 'warning');
-                                    continue;
+                                if (startIndex < newEntries.length) {
+                                    // 新条目导入
+                                    await apiService.addEntry(entry);
+                                    successCount++;
+                                } else {
+                                    // 已存在条目更新
+                                    const existingEntry = existingChineseMap.get(entry.Chinese);
+                                    if (existingEntry) {
+                                        // 进行字段级别比较和更新
+                                        const updatedEntry: Partial<TranslationEntry> = {};
+                                        let needUpdate = false;
+                                        
+                                        // 遍历所有字段，只更新有内容的字段
+                                        Object.keys(entry).forEach(key => {
+                                            // 如果导入数据有内容且与现有数据不同
+                                            if (entry[key] && entry[key] !== existingEntry[key]) {
+                                                // 如果现有数据为空或者两者都有内容但不同
+                                                if (!existingEntry[key] || (entry[key] && existingEntry[key])) {
+                                                    updatedEntry[key] = entry[key];
+                                                    needUpdate = true;
+                                                }
+                                            }
+                                        });
+                                        
+                                        if (needUpdate) {
+                                            await apiService.updateEntry(entry.Chinese, updatedEntry);
+                                            this.log(`更新条目: "${entry.Chinese}"`, 'info');
+                                            updateCount++;
+                                        } else {
+                                            this.log(`无需更新条目: "${entry.Chinese}"`, 'info');
+                                        }
+                                    } else {
+                                        // 这是一个重复条目错误，记录为警告而不是错误
+                                        this.log(`跳过重复条目: "${entry.Chinese}"`, 'warning');
+                                    }
                                 }
-                                
-                                await apiService.addEntry(entry);
-                                successCount++;
-                                // 添加到已存在集合中，防止后续重复添加
-                                existingChineseSet.add(entry.Chinese);
                             } catch (error) {
                                 const errorMessage = (error as Error).message || '未知错误';
                                 
@@ -449,10 +471,6 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
                                 if (errorMessage.includes('409') && errorMessage.includes('条目已存在')) {
                                     // 这是一个重复条目错误，记录为警告而不是错误
                                     this.log(`跳过重复条目: "${entry.Chinese}"`, 'warning');
-                                    // 添加到已存在集合中
-                                    existingChineseSet.add(entry.Chinese);
-                                    // 更新重复条目计数而不是失败计数
-                                    duplicateEntries.push(entry);
                                 } else {
                                     // 其他类型的错误
                                     failCount++;
@@ -472,10 +490,10 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
                     }
                     
                     // 更新进度
-                    const progress = Math.round((endIndex + duplicateEntries.length) / entries.length * 100);
+                    const progress = Math.round((endIndex + duplicateEntries.length) / (newEntries.length + duplicateEntries.length) * 100);
                     this.progressFill.style.width = `${progress}%`;
                     this.progressText.textContent = `${progress}%`;
-                    this.progressDetails.textContent = `已处理 ${endIndex + duplicateEntries.length} / ${entries.length} 条记录，成功: ${successCount}，失败: ${failCount}，跳过重复: ${duplicateEntries.length}`;
+                    this.progressDetails.textContent = `已处理 ${endIndex + duplicateEntries.length} / ${newEntries.length + duplicateEntries.length} 条记录，成功: ${successCount}，失败: ${failCount}，更新: ${updateCount}`;
                     
                     // 处理下一批
                     setTimeout(() => importBatch(endIndex), 0);
