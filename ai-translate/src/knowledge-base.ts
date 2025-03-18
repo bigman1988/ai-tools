@@ -81,6 +81,11 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
         this.addEntryBtn = document.getElementById('addEntryBtn') as HTMLButtonElement;
         this.deleteSelectedBtn = document.getElementById('deleteSelectedBtn') as HTMLButtonElement;
         this.sourceLang = document.getElementById('sourceLang') as HTMLSelectElement;
+        
+        // 检查必要的DOM元素是否存在
+        if (!this.fileInput || !this.uploadBtn || !this.kbTableOutput) {
+            console.error('无法找到必要的DOM元素');
+        }
     }
 
     /**

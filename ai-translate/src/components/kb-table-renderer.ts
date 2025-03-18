@@ -34,29 +34,27 @@ export class KnowledgeBaseTableRenderer {
 
         // 创建表格容器
         this.container.innerHTML = `
-            <div class="table-wrapper">
-                <table class="kb-table">
-                    <thead>
-                        <tr>
-                            <th class="checkbox-cell"><input type="checkbox" id="selectAll"></th>
-                            <th>中文</th>
-                            <th>英文</th>
-                            <th>日文</th>
-                            <th>韩文</th>
-                            <th>西班牙文</th>
-                            <th>法文</th>
-                            <th>德文</th>
-                            <th>俄文</th>
-                            <th>泰文</th>
-                            <th>意大利文</th>
-                            <th>印尼文</th>
-                            <th>葡萄牙文</th>
-                        </tr>
-                    </thead>
-                    <tbody id="entriesTableBody">
-                    </tbody>
-                </table>
-            </div>
+            <table class="kb-table">
+                <thead>
+                    <tr>
+                        <th class="checkbox-cell"><input type="checkbox" id="selectAll"></th>
+                        <th>中文</th>
+                        <th>英文</th>
+                        <th>日文</th>
+                        <th>韩文</th>
+                        <th>西班牙文</th>
+                        <th>法文</th>
+                        <th>德文</th>
+                        <th>俄文</th>
+                        <th>泰文</th>
+                        <th>意大利文</th>
+                        <th>印尼文</th>
+                        <th>葡萄牙文</th>
+                    </tr>
+                </thead>
+                <tbody id="entriesTableBody">
+                </tbody>
+            </table>
         `;
 
         // 获取表格体

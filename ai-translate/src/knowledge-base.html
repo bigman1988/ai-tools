@@ -8,7 +8,8 @@
         :root {
             --primary-color: #1890ff;
             --border-color: #e8e8e8;
-            --background-color: #f5f5f5;
+            --background-color: #f0f2f5;
+            --text-color: #333;
         }
 
         * {
@@ -17,27 +18,82 @@
             padding: 0;
         }
 
-        body {
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             line-height: 1.5;
             color: #333;
+            background: white;
         }
 
         .app-container {
             display: grid;
             grid-template-columns: 300px 1fr;
-            min-height: 100vh;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            border: none;
+            margin: 0;
+            padding: 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
         }
 
         .sidebar {
             background: white;
-            border-right: 1px solid var(--border-color);
-            padding: 20px;
+            padding: 0;
+            overflow-y: auto;
+            height: 100%;
+            border: none;
+            margin: 0;
+        }
+
+        .sidebar h2 {
+            padding: 10px 15px;
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .source-lang-selector,
+        .file-input-container {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .file-input-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .file-name {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            word-break: break-all;
+            max-width: 100%;
         }
 
         .main-content {
-            background: var(--background-color);
-            padding: 20px;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .knowledge-base-container {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+            height: 100%;
         }
 
         .search-container {
@@ -45,10 +101,9 @@
             gap: 10px;
             padding: 10px;
             background: white;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
             align-items: center;
+            flex-shrink: 0;
         }
 
         .search-input {
@@ -81,49 +136,52 @@
             margin-bottom: 20px;
         }
 
-        .table-wrapper {
+        .kb-table-container {
             background: white;
-            border-radius: 4px;
             overflow: auto;
-            max-height: calc(100vh - 180px);
-            border: 1px solid var(--border-color);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            margin: 0;
+            border: none;
         }
 
         .kb-table {
             width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
+            margin: 0;
+            border: none;
         }
 
         .kb-table th,
         .kb-table td {
-            padding: 12px;
+            padding: 8px;
             text-align: left;
-            border: 1px solid var(--border-color);
-            white-space: normal;
-            overflow: visible;
-            word-break: break-word;
+            border-bottom: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .kb-table th {
-            background: #fafafa;
+            background-color: #f5f5f5;
             font-weight: 500;
             position: sticky;
             top: 0;
-            z-index: 1;
+            z-index: 10;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .kb-table th:first-child,
+        .kb-table td:first-child {
+            border-left: 1px solid var(--border-color);
         }
 
         .kb-table tbody tr:hover {
-            background: #f0f7ff;
-            cursor: pointer;
-        }
-
-        .content-cell {
-            min-width: 150px;
-            max-width: 300px;
-            vertical-align: top;
-            line-height: 1.5;
-            white-space: pre-wrap;
+            background-color: #f5f5f5;
         }
 
         .checkbox-cell {
@@ -131,76 +189,123 @@
             text-align: center;
         }
 
-        .btn-small {
-            padding: 4px 8px;
-            font-size: 12px;
-            margin: 0 2px;
-        }
-
-        .view-btn {
-            background: #52c41a;
-        }
-
-        .edit-btn {
-            background: #faad14;
+        .action-cell {
+            width: 100px;
+            text-align: center;
         }
 
         .log-container {
-            margin-top: 20px;
+            padding: 15px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            height: 30%;
+        }
+
+        .log-container h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
         }
 
         .log-output {
-            height: 200px;
-            overflow-y: auto;
+            background: #f8f8f8;
             border: 1px solid var(--border-color);
+            border-radius: 4px;
             padding: 10px;
-            background: #fafafa;
+            font-family: monospace;
             font-size: 12px;
+            overflow-y: auto;
+            flex: 1;
+            max-height: calc(100% - 30px);
         }
 
-        /* 滚动条样式 */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #888;
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: #555;
-        }
-
-        .file-input-container {
-            margin-top: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .file-name {
-            margin: 10px 0;
-            padding: 5px;
-            background: #f0f0f0;
-            border-radius: 4px;
-            min-height: 20px;
-            word-break: break-all;
-        }
-        
         .button-group {
             margin-top: 10px;
         }
-        
-        .action-buttons-row {
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 4px;
+            width: 500px;
+            max-width: 90%;
+        }
+
+        .modal-header {
             display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
         }
         
+        .form-control {
+            flex: 1;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .source-lang-selector {
+            margin: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .source-lang-selector label {
+            display: inline;
+            margin-bottom: 0;
+            font-weight: normal;
+        }
+
+        .select-input {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
         .progress-wrapper {
             height: 20px;
             background-color: #f0f0f0;
@@ -234,6 +339,25 @@
             color: #666;
             margin-top: 5px;
         }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
     </style>
     <script defer src="knowledgeBase.bundle.js"></script>
 </head>
@@ -245,15 +369,12 @@
                 <label for="sourceLang">源语言：</label>
                 <select id="sourceLang" class="select-input">
                     <option value="zh-CN">简体中文</option>
-                    <option value="en">英语</option>
                 </select>
             </div>
             <div class="file-input-container">
-                <input type="file" id="fileInput" accept=".xlsx,.xls,.json" style="display: none;" />
+                <button id="uploadBtn" class="btn">从文件中批量导入</button>
+                <input type="file" id="fileInput" style="display: none;" accept=".xlsx, .xls">
                 <div id="fileName" class="file-name"></div>
-                <div class="button-group">
-                    <button class="btn" id="uploadBtn">从文件中批量导入</button>
-                </div>
                 <div id="actionButtons" class="button-group" style="display: none;">
                     <div class="progress-wrapper">
                         <div id="progressFill" class="progress-fill"></div>
@@ -272,13 +393,46 @@
         <div class="main-content">
             <div class="knowledge-base-container">
                 <div class="search-container">
-                    <input type="text" id="searchInput" placeholder="搜索知识库内容..." class="search-input">
+                    <input type="text" id="searchInput" class="search-input" placeholder="搜索知识库内容...">
                     <button id="searchBtn" class="btn">搜索</button>
                     <button id="addEntryBtn" class="btn">添加条目</button>
                     <button id="deleteSelectedBtn" class="btn">删除所选</button>
                 </div>
-                <div id="kbTableOutput" class="kb-table"></div>
+                <div id="kbTableOutput" class="kb-table-container"></div>
             </div>
+        </div>
+    </div>
+
+    <!-- 添加/编辑条目模态框 -->
+    <div id="entryModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">添加条目</h2>
+                <button class="close-btn" id="closeModal">&times;</button>
+            </div>
+            <form id="entryForm">
+                <input type="hidden" id="entryId">
+                <div class="form-group">
+                    <label for="chineseInput">中文</label>
+                    <textarea id="chineseInput" rows="3" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="englishInput">英文</label>
+                    <textarea id="englishInput" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="japaneseInput">日文</label>
+                    <textarea id="japaneseInput" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="koreanInput">韩文</label>
+                    <textarea id="koreanInput" rows="3"></textarea>
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="btn" id="saveEntryBtn">保存</button>
+                    <button type="button" class="btn" id="cancelBtn">取消</button>
+                </div>
+            </form>
         </div>
     </div>
 </body>
