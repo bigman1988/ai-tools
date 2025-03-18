@@ -3,6 +3,13 @@ import { excelImporter } from './services/excel-importer';
 import { databaseService, TranslationEntry } from './services/database';
 import * as XLSX from 'xlsx';
 
+// 添加全局实例变量，用于检查是否已经初始化
+declare global {
+    interface Window {
+        knowledgeBaseManagerInstance?: KnowledgeBaseManager;
+    }
+}
+
 class KnowledgeBaseManager {
     private fileInput: HTMLInputElement;
     private fileName: HTMLDivElement;
@@ -43,8 +50,15 @@ class KnowledgeBaseManager {
         this.sourceLang = document.getElementById('sourceLang') as HTMLSelectElement;
         this.targetLang = document.getElementById('targetLang') as HTMLSelectElement;
 
-        this.initEventListeners();
-        this.initDatabase();
+        // 检查是否已经初始化过，避免重复注册事件监听器
+        if (!window.knowledgeBaseManagerInstance) {
+            console.log('初始化知识库管理器事件监听器和数据库');
+            this.initEventListeners();
+            this.initDatabase();
+            window.knowledgeBaseManagerInstance = this;
+        } else {
+            console.log('检测到已存在知识库管理器实例，跳过事件监听器初始化');
+        }
     }
 
     private initEventListeners(): void {
@@ -583,5 +597,5 @@ class KnowledgeBaseManager {
 
 // 当DOM加载完成后初始化应用
 document.addEventListener('DOMContentLoaded', () => {
-    new KnowledgeBaseManager();
+    window.knowledgeBaseManagerInstance = new KnowledgeBaseManager();
 });
