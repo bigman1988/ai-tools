@@ -1,11 +1,19 @@
 import mysql from 'mysql2/promise';
 
-export interface KnowledgeBaseEntry {
+export interface TranslationEntry {
     id?: number;
-    source_text: string;
-    target_text: string;
-    source_language: string;
-    target_language: string;
+    Chinese: string;
+    English: string;
+    Japanese: string;
+    Korean: string;
+    Spanish: string;
+    French: string;
+    German: string;
+    Russian: string;
+    Thai: string;
+    Italian: string;
+    Indonesian: string;
+    Portuguese: string;
     created_at?: Date;
     updated_at?: Date;
 }
@@ -27,14 +35,22 @@ export class DatabaseService {
 
     async initializeDatabase(): Promise<void> {
         try {
-            // Create knowledge_base table if it doesn't exist
+            // Create translate-cn table if it doesn't exist
             await this.pool.execute(`
-                CREATE TABLE IF NOT EXISTS knowledge_base (
+                CREATE TABLE IF NOT EXISTS \`translate-cn\` (
                     id INT AUTO_INCREMENT PRIMARY KEY,
-                    source_text TEXT NOT NULL,
-                    target_text TEXT NOT NULL,
-                    source_language VARCHAR(10) NOT NULL,
-                    target_language VARCHAR(10) NOT NULL,
+                    Chinese TEXT,
+                    English TEXT,
+                    Japanese TEXT,
+                    Korean TEXT,
+                    Spanish TEXT,
+                    French TEXT,
+                    German TEXT,
+                    Russian TEXT,
+                    Thai TEXT,
+                    Italian TEXT,
+                    Indonesian TEXT,
+                    Portuguese TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 )
@@ -46,79 +62,77 @@ export class DatabaseService {
         }
     }
 
-    async addEntry(entry: KnowledgeBaseEntry): Promise<number> {
+    async addEntry(entry: TranslationEntry): Promise<number> {
         try {
             const [result] = await this.pool.execute(
-                'INSERT INTO knowledge_base (source_text, target_text, source_language, target_language) VALUES (?, ?, ?, ?)',
-                [entry.source_text, entry.target_text, entry.source_language, entry.target_language]
+                'INSERT INTO `translate-cn` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                    entry.Chinese || '',
+                    entry.English || '',
+                    entry.Japanese || '',
+                    entry.Korean || '',
+                    entry.Spanish || '',
+                    entry.French || '',
+                    entry.German || '',
+                    entry.Russian || '',
+                    entry.Thai || '',
+                    entry.Italian || '',
+                    entry.Indonesian || '',
+                    entry.Portuguese || ''
+                ]
             );
             return (result as mysql.ResultSetHeader).insertId;
         } catch (error) {
-            console.error('Error adding entry to knowledge base:', error);
+            console.error('Error adding entry to translation table:', error);
             throw error;
         }
     }
 
     async getEntries(
-        sourceLang?: string, 
-        targetLang?: string, 
         searchTerm?: string,
         limit: number = 100,
         offset: number = 0
-    ): Promise<KnowledgeBaseEntry[]> {
+    ): Promise<TranslationEntry[]> {
         try {
-            let query = 'SELECT * FROM knowledge_base WHERE 1=1';
+            let query = 'SELECT * FROM `translate-cn` WHERE 1=1';
             const params: any[] = [];
 
-            if (sourceLang) {
-                query += ' AND source_language = ?';
-                params.push(sourceLang);
-            }
-
-            if (targetLang) {
-                query += ' AND target_language = ?';
-                params.push(targetLang);
-            }
-
             if (searchTerm) {
-                query += ' AND (source_text LIKE ? OR target_text LIKE ?)';
-                params.push(`%${searchTerm}%`, `%${searchTerm}%`);
+                query += ' AND (Chinese LIKE ? OR English LIKE ? OR Japanese LIKE ? OR Korean LIKE ? OR Spanish LIKE ? OR French LIKE ? OR German LIKE ? OR Russian LIKE ? OR Thai LIKE ? OR Italian LIKE ? OR Indonesian LIKE ? OR Portuguese LIKE ?)';
+                const searchPattern = `%${searchTerm}%`;
+                params.push(
+                    searchPattern, searchPattern, searchPattern, searchPattern,
+                    searchPattern, searchPattern, searchPattern, searchPattern,
+                    searchPattern, searchPattern, searchPattern, searchPattern
+                );
             }
 
             query += ' ORDER BY id DESC LIMIT ? OFFSET ?';
             params.push(limit, offset);
 
             const [rows] = await this.pool.execute(query, params);
-            return rows as KnowledgeBaseEntry[];
+            return rows as TranslationEntry[];
         } catch (error) {
-            console.error('Error getting entries from knowledge base:', error);
+            console.error('Error getting entries from translation table:', error);
             throw error;
         }
     }
 
-    async updateEntry(id: number, entry: Partial<KnowledgeBaseEntry>): Promise<boolean> {
+    async updateEntry(id: number, entry: Partial<TranslationEntry>): Promise<boolean> {
         try {
             const fields: string[] = [];
             const values: any[] = [];
 
-            if (entry.source_text !== undefined) {
-                fields.push('source_text = ?');
-                values.push(entry.source_text);
-            }
+            const columns = [
+                'Chinese', 'English', 'Japanese', 'Korean', 'Spanish', 'French',
+                'German', 'Russian', 'Thai', 'Italian', 'Indonesian', 'Portuguese'
+            ];
 
-            if (entry.target_text !== undefined) {
-                fields.push('target_text = ?');
-                values.push(entry.target_text);
-            }
-
-            if (entry.source_language !== undefined) {
-                fields.push('source_language = ?');
-                values.push(entry.source_language);
-            }
-
-            if (entry.target_language !== undefined) {
-                fields.push('target_language = ?');
-                values.push(entry.target_language);
+            for (const column of columns) {
+                if (entry[column as keyof TranslationEntry] !== undefined) {
+                    fields.push(`${column} = ?`);
+                    values.push(entry[column as keyof TranslationEntry]);
+                }
             }
 
             if (fields.length === 0) {
@@ -128,13 +142,13 @@ export class DatabaseService {
             values.push(id);
 
             const [result] = await this.pool.execute(
-                `UPDATE knowledge_base SET ${fields.join(', ')} WHERE id = ?`,
+                `UPDATE \`translate-cn\` SET ${fields.join(', ')} WHERE id = ?`,
                 values
             );
 
             return (result as mysql.ResultSetHeader).affectedRows > 0;
         } catch (error) {
-            console.error('Error updating entry in knowledge base:', error);
+            console.error('Error updating entry in translation table:', error);
             throw error;
         }
     }
@@ -142,38 +156,46 @@ export class DatabaseService {
     async deleteEntry(id: number): Promise<boolean> {
         try {
             const [result] = await this.pool.execute(
-                'DELETE FROM knowledge_base WHERE id = ?',
+                'DELETE FROM `translate-cn` WHERE id = ?',
                 [id]
             );
             return (result as mysql.ResultSetHeader).affectedRows > 0;
         } catch (error) {
-            console.error('Error deleting entry from knowledge base:', error);
+            console.error('Error deleting entry from translation table:', error);
             throw error;
         }
     }
 
-    async bulkImport(entries: KnowledgeBaseEntry[]): Promise<number> {
+    async bulkImport(entries: TranslationEntry[]): Promise<number> {
         try {
             if (entries.length === 0) {
                 return 0;
             }
 
-            const placeholders = entries.map(() => '(?, ?, ?, ?)').join(', ');
+            const placeholders = entries.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
             const values = entries.flatMap(entry => [
-                entry.source_text,
-                entry.target_text,
-                entry.source_language,
-                entry.target_language
+                entry.Chinese || '',
+                entry.English || '',
+                entry.Japanese || '',
+                entry.Korean || '',
+                entry.Spanish || '',
+                entry.French || '',
+                entry.German || '',
+                entry.Russian || '',
+                entry.Thai || '',
+                entry.Italian || '',
+                entry.Indonesian || '',
+                entry.Portuguese || ''
             ]);
 
             const [result] = await this.pool.execute(
-                `INSERT INTO knowledge_base (source_text, target_text, source_language, target_language) VALUES ${placeholders}`,
+                `INSERT INTO \`translate-cn\` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese) VALUES ${placeholders}`,
                 values
             );
 
             return (result as mysql.ResultSetHeader).affectedRows;
         } catch (error) {
-            console.error('Error bulk importing entries to knowledge base:', error);
+            console.error('Error bulk importing entries to translation table:', error);
             throw error;
         }
     }

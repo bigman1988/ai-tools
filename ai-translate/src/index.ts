@@ -52,8 +52,15 @@ class ExcelTranslator {
     constructor() {
         this.tableOutput = document.getElementById('tableOutput');
         this.progressBar = new ProgressBar();
-        this.initializeEventListeners();
-        this.initializeUI();
+        
+        // 检查是否已经初始化过，避免重复注册事件监听器
+        if (!window.excelTranslatorInstance) {
+            this.initializeEventListeners();
+            this.initializeUI();
+            console.log('初始化事件监听器和UI');
+        } else {
+            console.log('检测到已存在实例，跳过事件监听器初始化');
+        }
         
         // 优先从环境变量获取API密钥，如果没有则使用输入框中的值
         if (process.env.DEEPSEEK_API_KEY) {

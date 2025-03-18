@@ -1,9 +1,13 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const Dotenv = require('dotenv-webpack');
+const webpack = require('webpack');
 
 module.exports = {
-    entry: './src/index.ts',
+    entry: {
+        main: './src/index.ts',
+        knowledgeBase: './src/knowledge-base.ts'
+    },
     mode: 'production',
     module: {
         rules: [
@@ -19,10 +23,30 @@ module.exports = {
         ]
     },
     resolve: {
-        extensions: ['.tsx', '.ts', '.js']
+        extensions: ['.tsx', '.ts', '.js'],
+        fallback: {
+            "buffer": require.resolve("buffer/"),
+            "crypto": require.resolve("crypto-browserify"),
+            "stream": require.resolve("stream-browserify"),
+            "util": require.resolve("util/"),
+            "process": require.resolve("process/browser"),
+            "zlib": require.resolve("browserify-zlib"),
+            "url": require.resolve("url/"),
+            "vm": require.resolve("vm-browserify"),
+            "timers": require.resolve("timers-browserify"),
+            "assert": require.resolve("assert/"),
+            "net": false,
+            "tls": false,
+            "fs": false,
+            "path": false,
+            "child_process": false
+        },
+        alias: {
+            'xlsx': path.resolve(__dirname, 'node_modules/xlsx/dist/xlsx.full.min.js')
+        }
     },
     output: {
-        filename: 'main.bundle.js',
+        filename: '[name].bundle.js',
         path: path.resolve(__dirname, 'dist')
     },
     plugins: [
@@ -34,10 +58,20 @@ module.exports = {
         new HtmlWebpackPlugin({
             template: './src/knowledge-base.html',
             filename: 'knowledge-base.html',
-            chunks: ['main']
+            chunks: ['knowledgeBase']
         }),
-        new Dotenv()
+        new Dotenv(),
+        new webpack.ProvidePlugin({
+            process: 'process/browser',
+            Buffer: ['buffer', 'Buffer']
+        })
     ],
+    optimization: {
+        splitChunks: {
+            chunks: 'all',
+            name: 'vendor'
+        }
+    },
     devServer: {
         static: {
             directory: path.join(__dirname, 'dist'),
