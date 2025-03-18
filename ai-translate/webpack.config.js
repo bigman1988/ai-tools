@@ -22,12 +22,19 @@ module.exports = {
         extensions: ['.tsx', '.ts', '.js']
     },
     output: {
-        filename: 'bundle.js',
+        filename: 'main.bundle.js',
         path: path.resolve(__dirname, 'dist')
     },
     plugins: [
         new HtmlWebpackPlugin({
-            template: './src/index.html'
+            template: './src/index.html',
+            filename: 'index.html',
+            chunks: ['main']
+        }),
+        new HtmlWebpackPlugin({
+            template: './src/knowledge-base.html',
+            filename: 'knowledge-base.html',
+            chunks: ['main']
         }),
         new Dotenv()
     ],
