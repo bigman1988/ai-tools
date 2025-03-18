@@ -189,6 +189,101 @@ app.delete('/api/entries/:Chinese', async (req, res) => {
     }
 });
 
+// 使用POST请求删除条目（处理特殊字符更可靠）
+app.post('/api/entries/delete', async (req, res) => {
+    try {
+        console.log('收到POST删除请求');
+        console.log('请求体:', JSON.stringify(req.body));
+        
+        const { id } = req.body;
+        
+        if (!id) {
+            console.log('未提供条目ID');
+            return res.status(400).json({ error: '未提供条目ID' });
+        }
+        
+        console.log(`尝试删除条目ID: "${id}"`);
+        
+        // 获取所有条目以进行精确匹配
+        const [allRows] = await pool.execute('SELECT * FROM `translate-cn`');
+        console.log(`数据库中共有 ${allRows.length} 条记录`);
+        
+        // 尝试找到匹配的条目
+        let matchedRow = null;
+        
+        for (const row of allRows) {
+            const dbId = row.Chinese;
+            if (!dbId) continue;
+            
+            // 打印出数据库中的ID和请求中的ID的十六进制表示，以便比较
+            const dbIdHex = Buffer.from(dbId).toString('hex');
+            const requestIdHex = Buffer.from(id).toString('hex');
+            
+            console.log(`数据库ID: "${dbId}"`);
+            console.log(`请求ID: "${id}"`);
+            console.log(`数据库ID (HEX): ${dbIdHex}`);
+            console.log(`请求ID (HEX): ${requestIdHex}`);
+            
+            // 规范化两个ID进行比较
+            const normalizedDbId = dbId.replace(/[\r\n\s]+/g, ' ').trim();
+            const normalizedRequestId = id.replace(/[\r\n\s]+/g, ' ').trim();
+            
+            console.log(`规范化后的数据库ID: "${normalizedDbId}"`);
+            console.log(`规范化后的请求ID: "${normalizedRequestId}"`);
+            
+            // 检查是否匹配
+            if (normalizedDbId === normalizedRequestId) {
+                console.log('找到完全匹配');
+                matchedRow = row;
+                break;
+            }
+            
+            // 检查是否部分匹配
+            if (normalizedDbId.includes(normalizedRequestId) || normalizedRequestId.includes(normalizedDbId)) {
+                console.log('找到部分匹配');
+                matchedRow = row;
+                break;
+            }
+            
+            // 检查是否匹配前几个字符（对于可能被截断的ID）
+            const minLength = Math.min(normalizedDbId.length, normalizedRequestId.length);
+            if (minLength > 10 && normalizedDbId.substring(0, minLength) === normalizedRequestId.substring(0, minLength)) {
+                console.log('找到前缀匹配');
+                matchedRow = row;
+                break;
+            }
+        }
+        
+        if (!matchedRow) {
+            console.log('未找到匹配的条目');
+            return res.status(404).json({ error: '找不到指定的条目' });
+        }
+        
+        // 使用找到的条目的实际ID进行删除
+        const actualId = matchedRow.Chinese;
+        console.log(`使用实际ID删除: "${actualId}"`);
+        
+        // 执行删除操作
+        const [result] = await pool.execute(
+            'DELETE FROM `translate-cn` WHERE Chinese = ?',
+            [actualId]
+        );
+
+        console.log('删除结果:', JSON.stringify(result));
+
+        if (result.affectedRows === 0) {
+            console.log(`未删除任何条目`);
+            return res.status(404).json({ error: '找不到指定的条目' });
+        }
+
+        console.log('删除成功');
+        res.json({ success: true });
+    } catch (error) {
+        console.error('删除条目失败:', error);
+        res.status(500).json({ error: '删除条目失败', details: error.message });
+    }
+});
+
 // 导入Excel文件
 app.post('/api/import', upload.single('file'), async (req, res) => {
     try {
@@ -314,6 +409,66 @@ app.get('/api/export', async (req, res) => {
     } catch (error) {
         console.error('导出数据失败:', error);
         res.status(500).json({ error: '导出数据失败', details: error.message });
+    }
+});
+
+// 添加一个新的端点来查看所有条目
+app.get('/api/debug/entries', async (req, res) => {
+    try {
+        console.log('收到调试请求，获取所有条目');
+        
+        const [rows] = await pool.execute(
+            'SELECT * FROM `translate-cn`'
+        );
+        
+        console.log(`找到 ${rows.length} 条记录`);
+        
+        // 为每个条目添加一个特殊标记，以便更容易识别包含特殊字符的条目
+        const enhancedRows = rows.map(row => {
+            return {
+                ...row,
+                _chineseLength: row.Chinese ? row.Chinese.length : 0,
+                _chineseHasNewline: row.Chinese ? row.Chinese.includes('\n') : false,
+                _chineseHasCurlyBraces: row.Chinese ? row.Chinese.includes('{') || row.Chinese.includes('}') : false
+            };
+        });
+        
+        res.json(enhancedRows);
+    } catch (error) {
+        console.error('获取调试条目失败:', error);
+        res.status(500).json({ error: '获取调试条目失败', details: error.message });
+    }
+});
+
+// 添加一个新的端点来查看所有条目（更详细的版本）
+app.get('/api/debug/entries/detail', async (req, res) => {
+    try {
+        console.log('收到详细调试请求，获取所有条目');
+        
+        const [rows] = await pool.execute(
+            'SELECT * FROM `translate-cn`'
+        );
+        
+        console.log(`找到 ${rows.length} 条记录`);
+        
+        // 为每个条目添加更详细的调试信息
+        const enhancedRows = rows.map(row => {
+            const chinese = row.Chinese || '';
+            return {
+                ...row,
+                _chineseLength: chinese.length,
+                _chineseHasNewline: chinese.includes('\n'),
+                _chineseHasCarriageReturn: chinese.includes('\r'),
+                _chineseHasCurlyBraces: chinese.includes('{') || chinese.includes('}'),
+                _chineseCharCodes: Array.from(chinese).map(char => char.charCodeAt(0)),
+                _chineseHexDump: Buffer.from(chinese).toString('hex')
+            };
+        });
+        
+        res.json(enhancedRows);
+    } catch (error) {
+        console.error('获取详细调试条目失败:', error);
+        res.status(500).json({ error: '获取详细调试条目失败', details: error.message });
     }
 });
 

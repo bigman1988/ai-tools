@@ -1,1 +1,162 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>翻译知识库管理</title><script defer="defer" src="knowledgeBase.bundle.js"></script><script defer="defer" src="vendor.bundle.js"></script><script defer="defer" src="knowledgeBase.bundle.js"></script></head><body><div class="app-container"><div class="sidebar"><h2>翻译知识库管理</h2><div class="source-lang-selector"><label for="sourceLang">源语言：</label> <select id="sourceLang" class="select-input"><option value="zh-CN">简体中文</option><option value="en">英语</option></select></div><div class="file-input-container"><input type="file" id="fileInput" accept=".xlsx,.xls,.json" style="display: none;"/><div id="fileName" class="file-name"></div><div class="button-group"><button class="btn" id="uploadBtn">选择文件</button></div><div id="actionButtons" class="button-group" style="display: none;"><div class="action-buttons-row"><button id="importBtn" class="btn">导入知识库</button></div><div class="progress-wrapper"><div class="progress-container"><div class="progress-fill"></div><div class="progress-text">0%</div></div><div class="progress-details" style="display: none;">已完成: 0 / 0 条目</div></div></div></div><div class="log-container"><h3>操作日志</h3><div id="logOutput" class="log-output"></div></div></div><div class="main-content"><div class="knowledge-base-container"><div class="search-container"><input id="searchInput" placeholder="搜索知识库内容..." class="search-input"> <button id="searchBtn" class="btn">搜索</button></div><div class="kb-controls"><button id="addEntryBtn" class="btn">添加条目</button> <button id="deleteSelectedBtn" class="btn">删除所选</button></div><div id="kbTableOutput" class="kb-table"></div></div></div></div></body></html>
+<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>翻译知识库管理</title><style>:root {
+            --primary-color: #1890ff;
+            --border-color: #e8e8e8;
+            --background-color: #f5f5f5;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        .app-container {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            background: white;
+            border-right: 1px solid var(--border-color);
+            padding: 20px;
+        }
+
+        .main-content {
+            background: var(--background-color);
+            padding: 20px;
+        }
+
+        .search-container {
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn:hover {
+            background: #40a9ff;
+        }
+
+        .kb-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .table-wrapper {
+            background: white;
+            border-radius: 4px;
+            overflow: auto;
+            max-height: calc(100vh - 180px);
+            border: 1px solid var(--border-color);
+        }
+
+        .kb-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .kb-table th,
+        .kb-table td {
+            padding: 12px;
+            text-align: left;
+            border: 1px solid var(--border-color);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .kb-table th {
+            background: #fafafa;
+            font-weight: 500;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .kb-table tbody tr:hover {
+            background: #f0f7ff;
+        }
+
+        .checkbox-cell {
+            width: 40px;
+            text-align: center;
+        }
+
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 12px;
+            margin: 0 2px;
+        }
+
+        .view-btn {
+            background: #52c41a;
+        }
+
+        .edit-btn {
+            background: #faad14;
+        }
+
+        .log-container {
+            margin-top: 20px;
+        }
+
+        .log-output {
+            height: 200px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            background: #fafafa;
+            font-size: 12px;
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }</style><script defer="defer" src="knowledgeBase.bundle.js"></script><script defer="defer" src="vendor.bundle.js"></script><script defer="defer" src="knowledgeBase.bundle.js"></script></head><body><div class="app-container"><div class="sidebar"><h2>翻译知识库管理</h2><div class="source-lang-selector"><label for="sourceLang">源语言：</label> <select id="sourceLang" class="select-input"><option value="zh-CN">简体中文</option><option value="en">英语</option></select></div><div class="file-input-container"><input type="file" id="fileInput" accept=".xlsx,.xls,.json" style="display: none;"/><div id="fileName" class="file-name"></div><div class="button-group"><button class="btn" id="uploadBtn">选择文件</button></div><div id="actionButtons" class="button-group" style="display: none;"><div class="action-buttons-row"><button id="importBtn" class="btn">导入知识库</button></div><div class="progress-wrapper"><div class="progress-container"><div class="progress-fill"></div><div class="progress-text">0%</div></div><div class="progress-details" style="display: none;">已完成: 0 / 0 条目</div></div></div></div><div class="log-container"><h3>操作日志</h3><div id="logOutput" class="log-output"></div></div></div><div class="main-content"><div class="knowledge-base-container"><div class="search-container"><input id="searchInput" placeholder="搜索知识库内容..." class="search-input"> <button id="searchBtn" class="btn">搜索</button> <button id="addEntryBtn" class="btn">添加条目</button> <button id="deleteSelectedBtn" class="btn">删除所选</button></div><div id="kbTableOutput" class="kb-table"></div></div></div></div></body></html>

@@ -83,20 +83,36 @@ class ApiService {
         }
     }
 
-    async deleteEntry(chinese: string): Promise<boolean> {
+    /**
+     * 删除一个翻译条目
+     * @param id 条目ID（中文）
+     * @returns 是否删除成功
+     */
+    async deleteEntry(id: string): Promise<boolean> {
         try {
-            const response = await fetch(`${this.baseUrl}/entries/${encodeURIComponent(chinese)}`, {
-                method: 'DELETE'
+            console.log(`API服务 - 删除条目，原始ID: "${id}"`);
+            
+            // 使用POST请求发送删除请求，将ID放在请求体中
+            // 注意：我们不再对ID进行任何预处理，保留所有原始字符
+            const response = await fetch(`${this.baseUrl}/entries/delete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ id })
             });
-
+            
             if (!response.ok) {
+                const errorData = await response.json();
+                console.error('删除条目失败:', errorData);
                 throw new Error(`删除条目失败: ${response.status}`);
             }
-
-            const result = await response.json();
-            return result.success;
+            
+            const data = await response.json();
+            console.log('删除条目成功:', data);
+            return true;
         } catch (error) {
-            console.error('删除条目失败:', error);
+            console.error('删除条目出错:', error);
             throw error;
         }
     }
