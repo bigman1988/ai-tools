@@ -30,9 +30,9 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
     private searchInput!: HTMLInputElement;
     private searchBtn!: HTMLButtonElement;
     private kbTableOutput!: HTMLDivElement;
-    private addEntryBtn!: HTMLButtonElement;
     private deleteSelectedBtn!: HTMLButtonElement;
     private sourceLang!: HTMLSelectElement;
+    private addEntryBtn!: HTMLButtonElement;
     
     // 日志记录函数
     private logFunction: (message: string, type: 'info' | 'warning' | 'error') => void;
@@ -78,7 +78,6 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
         this.searchInput = document.getElementById('searchInput') as HTMLInputElement;
         this.searchBtn = document.getElementById('searchBtn') as HTMLButtonElement;
         this.kbTableOutput = document.getElementById('kbTableOutput') as HTMLDivElement;
-        this.addEntryBtn = document.getElementById('addEntryBtn') as HTMLButtonElement;
         this.deleteSelectedBtn = document.getElementById('deleteSelectedBtn') as HTMLButtonElement;
         this.sourceLang = document.getElementById('sourceLang') as HTMLSelectElement;
         
@@ -134,11 +133,6 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
                 const searchTerm = this.searchInput.value.trim();
                 this.loadEntries(searchTerm);
             }
-        });
-
-        // 添加条目按钮事件
-        this.addEntryBtn.addEventListener('click', () => {
-            this.tableRenderer.showAddEntryForm();
         });
 
         // 批量删除按钮事件
