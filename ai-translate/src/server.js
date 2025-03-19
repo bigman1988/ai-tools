@@ -200,57 +200,20 @@ app.post('/api/entries', async (req, res) => {
         }
         
         // 生成向量并存储到向量数据库
-        let chineseVectorId = null;
-        let englishVectorId = null;
+        let vectorId = null;
         
         if (vectorServiceAvailable) {
             try {
-                // 为中文和英文分别创建向量
-                if (entry.Chinese) {
-                    console.log(`创建中文向量: ${entry.Chinese}`);
-                    const chineseResult = await embeddingService.storeEmbedding(
-                        entry.Chinese,
-                        {
-                            Chinese: entry.Chinese,
-                            English: entry.English || '',
-                            type: 'chinese'
-                        }
-                    );
-                    
-                    if (chineseResult.success) {
-                        chineseVectorId = chineseResult.id;
-                        console.log(`中文向量ID: ${chineseVectorId}`);
-                    } else {
-                        console.error(`创建中文向量失败: ${entry.Chinese}`);
-                    }
-                }
+                console.log(`存储翻译条目向量: ${entry.Chinese}`);
+                // 使用新的方法存储完整的翻译条目向量
+                const vectorResult = await embeddingService.storeEntryVectors(entry);
                 
-                if (entry.English) {
-                    console.log(`创建英文向量: ${entry.English}`);
-                    const englishResult = await embeddingService.storeEmbedding(
-                        entry.English,
-                        {
-                            Chinese: entry.Chinese,
-                            English: entry.English,
-                            type: 'english'
-                        }
-                    );
-                    
-                    if (englishResult.success) {
-                        englishVectorId = englishResult.id;
-                        console.log(`英文向量ID: ${englishVectorId}`);
-                    } else {
-                        console.error(`创建英文向量失败: ${entry.English}`);
-                    }
-                }
-                
-                // 使用JSON存储两种向量ID
-                if (chineseVectorId || englishVectorId) {
-                    const vectorIds = {
-                        chinese: chineseVectorId,
-                        english: englishVectorId
-                    };
-                    entry.vector_id = JSON.stringify(vectorIds);
+                if (vectorResult.success) {
+                    vectorId = vectorResult.id;
+                    console.log(`向量ID: ${vectorId}`);
+                    entry.vector_id = vectorId;
+                } else {
+                    console.error(`创建向量失败: ${entry.Chinese}`);
                 }
             } catch (vectorError) {
                 console.error('向量处理失败:', vectorError);
@@ -342,55 +305,37 @@ app.put('/api/entries/:Chinese', async (req, res) => {
         // 更新向量存储
         if (vectorServiceAvailable) {
             try {
-                // 为中文和英文分别创建向量
-                let chineseVectorId = null;
-                let englishVectorId = null;
-                
-                // 更新中文向量
-                const chineseResult = await embeddingService.storeEmbedding(
-                    Chinese,
-                    {
-                        Chinese: Chinese,
-                        English: entry.English || '',
-                        type: 'chinese'
-                    }
+                // 首先获取当前条目的完整数据
+                const [currentEntry] = await pool.execute(
+                    'SELECT * FROM `translate` WHERE Chinese = ?',
+                    [Chinese]
                 );
                 
-                if (chineseResult.success) {
-                    chineseVectorId = chineseResult.id;
-                    console.log(`中文向量ID: ${chineseVectorId}`);
+                if (currentEntry.length === 0) {
+                    console.log(`未找到要更新的条目: ${Chinese}`);
                 } else {
-                    console.error(`更新中文向量失败: ${Chinese}`);
-                }
-                
-                // 如果有英文内容，更新英文向量
-                if (entry.English) {
-                    const englishResult = await embeddingService.storeEmbedding(
-                        entry.English,
-                        {
-                            Chinese: Chinese,
-                            English: entry.English,
-                            type: 'english'
-                        }
-                    );
+                    // 合并当前数据和更新数据
+                    const fullEntry = { ...currentEntry[0], ...entry };
                     
-                    if (englishResult.success) {
-                        englishVectorId = englishResult.id;
-                        console.log(`英文向量ID: ${englishVectorId}`);
-                    } else {
-                        console.error(`更新英文向量失败: ${entry.English}`);
+                    // 获取当前的vector_id
+                    let currentVectorId = null;
+                    if (currentEntry[0].vector_id) {
+                        currentVectorId = currentEntry[0].vector_id;
                     }
-                }
-                
-                // 添加vector_id字段更新
-                if (chineseVectorId || englishVectorId) {
-                    fields.push('vector_id = ?');
-                    // 使用JSON存储两种向量ID
-                    const vectorIds = {
-                        chinese: chineseVectorId,
-                        english: englishVectorId
-                    };
-                    values.push(JSON.stringify(vectorIds));
+                    
+                    console.log(`更新翻译条目向量: ${Chinese}, 当前ID: ${currentVectorId}`);
+                    
+                    // 使用新的方法更新完整的翻译条目向量
+                    const vectorResult = await embeddingService.updateEntryVectors(currentVectorId, fullEntry);
+                    
+                    if (vectorResult.success) {
+                        console.log(`向量ID: ${vectorResult.id}`);
+                        // 添加vector_id字段更新
+                        fields.push('vector_id = ?');
+                        values.push(vectorResult.id);
+                    } else {
+                        console.error(`更新向量失败: ${Chinese}`);
+                    }
                 }
             } catch (vectorError) {
                 console.error('向量更新失败:', vectorError);
@@ -442,23 +387,10 @@ app.post('/api/entries/delete', async (req, res) => {
                 );
                 
                 if (vectorResult.length > 0 && vectorResult[0].vector_id) {
-                    try {
-                        const vectorIds = JSON.parse(vectorResult[0].vector_id);
-                        
-                        // 删除中文向量
-                        if (vectorIds.chinese) {
-                            const chineseResult = await embeddingService.deleteEmbedding(vectorIds.chinese);
-                            console.log(`删除中文向量${chineseResult ? '成功' : '失败'}: ${vectorIds.chinese}`);
-                        }
-                        
-                        // 删除英文向量
-                        if (vectorIds.english) {
-                            const englishResult = await embeddingService.deleteEmbedding(vectorIds.english);
-                            console.log(`删除英文向量${englishResult ? '成功' : '失败'}: ${vectorIds.english}`);
-                        }
-                    } catch (parseError) {
-                        console.error('解析向量ID失败:', parseError);
-                    }
+                    // 直接使用向量ID删除
+                    const vectorId = vectorResult[0].vector_id;
+                    const deleteResult = await embeddingService.deleteEmbedding(vectorId);
+                    console.log(`删除向量${deleteResult ? '成功' : '失败'}: ${vectorId}`);
                 } else {
                     console.log('未找到向量ID，跳过向量删除');
                 }

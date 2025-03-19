@@ -124,12 +124,179 @@ class OllamaEmbeddingService {
     }
 
     /**
+     * 存储完整翻译条目的向量（包含中文和英文向量）
+     * @param {Object} entry - 完整的翻译条目，包含所有语言
+     * @returns {Object} - 包含操作结果和向量ID的对象
+     */
+    async storeEntryVectors(entry) {
+        try {
+            if (!entry.Chinese && !entry.English) {
+                console.error('中文和英文内容均为空，无法生成向量');
+                return { success: false, id: null };
+            }
+
+            // 生成中文向量（如果有中文内容）
+            let vector_cn = null;
+            if (entry.Chinese) {
+                vector_cn = await this.generateEmbedding(entry.Chinese);
+                if (vector_cn === null) {
+                    console.error('生成中文嵌入向量失败');
+                }
+            }
+
+            // 生成英文向量（如果有英文内容）
+            let vector_en = null;
+            if (entry.English) {
+                vector_en = await this.generateEmbedding(entry.English);
+                if (vector_en === null) {
+                    console.error('生成英文嵌入向量失败');
+                }
+            }
+
+            // 如果两个向量都生成失败，则返回失败
+            if (vector_cn === null && vector_en === null) {
+                return { success: false, id: null };
+            }
+
+            // 使用UUID作为ID
+            const uuid = crypto.randomUUID();
+            
+            // 准备完整的payload数据
+            const payload = {
+                Chinese: entry.Chinese || '',
+                English: entry.English || '',
+                Japanese: entry.Japanese || '',
+                Korean: entry.Korean || '',
+                Spanish: entry.Spanish || '',
+                French: entry.French || '',
+                German: entry.German || '',
+                Russian: entry.Russian || '',
+                Thai: entry.Thai || '',
+                Italian: entry.Italian || '',
+                Indonesian: entry.Indonesian || '',
+                Portuguese: entry.Portuguese || ''
+            };
+
+            // 构建要存储的点
+            const point = {
+                id: uuid,
+                // 如果中文向量存在则使用中文向量，否则使用英文向量
+                vector: vector_cn || vector_en,
+                payload: payload
+            };
+
+            // 如果同时存在中文和英文向量，则添加到payload中
+            if (vector_cn && vector_en) {
+                point.payload.vector_cn = vector_cn;
+                point.payload.vector_en = vector_en;
+            }
+
+            // 存储到Qdrant
+            await this.qdrantClient.upsert(this.collectionName, {
+                wait: true,
+                points: [point]
+            });
+            
+            console.log(`成功存储翻译条目向量: ${uuid}`);
+            return { success: true, id: uuid };
+        } catch (error) {
+            console.error('存储翻译条目向量失败:', error);
+            return { success: false, id: null };
+        }
+    }
+
+    /**
+     * 更新翻译条目的向量
+     * @param {string} id - 要更新的向量ID
+     * @param {Object} entry - 完整的翻译条目，包含所有语言
+     * @returns {Object} - 包含操作结果和向量ID的对象
+     */
+    async updateEntryVectors(id, entry) {
+        try {
+            if (!id) {
+                // 如果没有ID，则创建新的向量
+                return await this.storeEntryVectors(entry);
+            }
+
+            if (!entry.Chinese && !entry.English) {
+                console.error('中文和英文内容均为空，无法更新向量');
+                return { success: false, id: null };
+            }
+
+            // 生成中文向量（如果有中文内容）
+            let vector_cn = null;
+            if (entry.Chinese) {
+                vector_cn = await this.generateEmbedding(entry.Chinese);
+                if (vector_cn === null) {
+                    console.error('生成中文嵌入向量失败');
+                }
+            }
+
+            // 生成英文向量（如果有英文内容）
+            let vector_en = null;
+            if (entry.English) {
+                vector_en = await this.generateEmbedding(entry.English);
+                if (vector_en === null) {
+                    console.error('生成英文嵌入向量失败');
+                }
+            }
+
+            // 如果两个向量都生成失败，则返回失败
+            if (vector_cn === null && vector_en === null) {
+                return { success: false, id: null };
+            }
+
+            // 准备完整的payload数据
+            const payload = {
+                Chinese: entry.Chinese || '',
+                English: entry.English || '',
+                Japanese: entry.Japanese || '',
+                Korean: entry.Korean || '',
+                Spanish: entry.Spanish || '',
+                French: entry.French || '',
+                German: entry.German || '',
+                Russian: entry.Russian || '',
+                Thai: entry.Thai || '',
+                Italian: entry.Italian || '',
+                Indonesian: entry.Indonesian || '',
+                Portuguese: entry.Portuguese || ''
+            };
+
+            // 构建要更新的点
+            const point = {
+                id: id,
+                // 如果中文向量存在则使用中文向量，否则使用英文向量
+                vector: vector_cn || vector_en,
+                payload: payload
+            };
+
+            // 如果同时存在中文和英文向量，则添加到payload中
+            if (vector_cn && vector_en) {
+                point.payload.vector_cn = vector_cn;
+                point.payload.vector_en = vector_en;
+            }
+
+            // 更新Qdrant中的向量
+            await this.qdrantClient.upsert(this.collectionName, {
+                wait: true,
+                points: [point]
+            });
+            
+            console.log(`成功更新翻译条目向量: ${id}`);
+            return { success: true, id: id };
+        } catch (error) {
+            console.error('更新翻译条目向量失败:', error);
+            return { success: false, id: null };
+        }
+    }
+
+    /**
      * 搜索相似文本
      * @param {string} text - 要搜索的文本
-     * @param {string} type - 搜索类型，可以是 'chinese' 或 'english'
+     * @param {string} language - 搜索语言，可以是 'chinese' 或 'english'
      * @param {number} limit - 返回结果数量限制
      */
-    async searchSimilar(text, type = 'chinese', limit = 5) {
+    async searchSimilar(text, language = 'chinese', limit = 5) {
         try {
             const embedding = await this.generateEmbedding(text);
             
@@ -138,37 +305,107 @@ class OllamaEmbeddingService {
                 return [];
             }
             
-            // 构建过滤条件，根据类型搜索
-            const filter = {
-                must: [
-                    {
-                        key: 'type',
-                        match: {
-                            value: type
-                        }
-                    }
-                ]
-            };
+            console.log(`开始搜索相似文本，语言: ${language}, 限制: ${limit}`);
             
-            console.log(`开始搜索相似文本，类型: ${type}, 限制: ${limit}`);
-            const searchResults = await this.qdrantClient.search(this.collectionName, {
-                vector: embedding,
-                limit,
-                filter,
-                with_payload: true
-            });
+            // 根据语言选择不同的搜索策略
+            let searchResults;
+            
+            if (language === 'english') {
+                // 如果是英文搜索，优先使用vector_en字段
+                searchResults = await this.qdrantClient.search(this.collectionName, {
+                    vector: embedding,
+                    limit,
+                    with_payload: true,
+                    with_vectors: true  // 获取向量数据
+                });
+                
+                // 对结果进行后处理，使用vector_en进行重新排序（如果存在）
+                searchResults = searchResults.map(result => {
+                    // 如果存在英文向量，计算与查询向量的相似度
+                    if (result.payload && result.payload.vector_en) {
+                        const similarity = this.calculateCosineSimilarity(embedding, result.payload.vector_en);
+                        return { ...result, score: similarity };
+                    }
+                    return result;
+                });
+            } else {
+                // 如果是中文搜索，优先使用vector_cn字段
+                searchResults = await this.qdrantClient.search(this.collectionName, {
+                    vector: embedding,
+                    limit,
+                    with_payload: true,
+                    with_vectors: true  // 获取向量数据
+                });
+                
+                // 对结果进行后处理，使用vector_cn进行重新排序（如果存在）
+                searchResults = searchResults.map(result => {
+                    // 如果存在中文向量，计算与查询向量的相似度
+                    if (result.payload && result.payload.vector_cn) {
+                        const similarity = this.calculateCosineSimilarity(embedding, result.payload.vector_cn);
+                        return { ...result, score: similarity };
+                    }
+                    return result;
+                });
+            }
+            
+            // 按相似度排序
+            searchResults.sort((a, b) => b.score - a.score);
             
             console.log(`搜索完成，找到 ${searchResults.length} 条结果`);
             return searchResults.map(result => ({
                 id: result.id,
                 score: result.score,
-                metadata: result.payload
+                metadata: {
+                    Chinese: result.payload.Chinese,
+                    English: result.payload.English,
+                    Japanese: result.payload.Japanese,
+                    Korean: result.payload.Korean,
+                    Spanish: result.payload.Spanish,
+                    French: result.payload.French,
+                    German: result.payload.German,
+                    Russian: result.payload.Russian,
+                    Thai: result.payload.Thai,
+                    Italian: result.payload.Italian,
+                    Indonesian: result.payload.Indonesian,
+                    Portuguese: result.payload.Portuguese
+                }
             }));
         } catch (error) {
             console.error('搜索相似文本失败:', error);
             // 不抛出错误，而是返回空数组
             return [];
         }
+    }
+    
+    /**
+     * 计算两个向量之间的余弦相似度
+     * @param {Array} vec1 - 第一个向量
+     * @param {Array} vec2 - 第二个向量
+     * @returns {number} - 余弦相似度，范围在-1到1之间
+     */
+    calculateCosineSimilarity(vec1, vec2) {
+        if (!vec1 || !vec2 || vec1.length !== vec2.length) {
+            return 0;
+        }
+        
+        let dotProduct = 0;
+        let norm1 = 0;
+        let norm2 = 0;
+        
+        for (let i = 0; i < vec1.length; i++) {
+            dotProduct += vec1[i] * vec2[i];
+            norm1 += vec1[i] * vec1[i];
+            norm2 += vec2[i] * vec2[i];
+        }
+        
+        norm1 = Math.sqrt(norm1);
+        norm2 = Math.sqrt(norm2);
+        
+        if (norm1 === 0 || norm2 === 0) {
+            return 0;
+        }
+        
+        return dotProduct / (norm1 * norm2);
     }
 
     /**
