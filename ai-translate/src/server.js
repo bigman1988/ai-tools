@@ -334,7 +334,7 @@ app.put('/api/entries/:Chinese', async (req, res) => {
     }
 });
 
-// 删除翻译条目
+// 删除翻译条目 (POST方式)
 app.post('/api/entries/delete', async (req, res) => {
     try {
         const { Chinese } = req.body;
@@ -342,6 +342,8 @@ app.post('/api/entries/delete', async (req, res) => {
         if (!Chinese) {
             return res.status(400).json({ error: '未提供要删除的条目' });
         }
+        
+        console.log('尝试删除条目 (POST方式):', Chinese);
         
         // 删除向量存储中的向量
         if (vectorServiceAvailable) {
@@ -356,15 +358,90 @@ app.post('/api/entries/delete', async (req, res) => {
         }
 
         // 从数据库中删除条目
+        const encodedChinese = Chinese; // 使用原始值，不进行额外编码
+        
+        console.log('执行SQL删除，条目值:', encodedChinese);
+        
+        // 先检查条目是否存在
+        const [checkResult] = await pool.execute(
+            'SELECT COUNT(*) as count FROM `translate-cn` WHERE Chinese = ?',
+            [encodedChinese]
+        );
+        
+        if (checkResult[0].count === 0) {
+            console.log('未找到要删除的条目:', encodedChinese);
+            return res.status(404).json({ error: '未找到要删除的条目', value: encodedChinese });
+        }
+
+        // 执行删除操作
         const [result] = await pool.execute(
             'DELETE FROM `translate-cn` WHERE Chinese = ?',
-            [Chinese]
+            [encodedChinese]
         );
 
         if (result.affectedRows === 0) {
+            console.log('删除失败，未找到条目:', encodedChinese);
             res.status(404).json({ error: '未找到要删除的条目' });
         } else {
-            console.log('删除条目成功:', Chinese);
+            console.log('删除条目成功:', encodedChinese, '影响行数:', result.affectedRows);
+            res.json({ success: true });
+        }
+    } catch (error) {
+        console.error('删除条目失败:', error);
+        res.status(500).json({ error: '删除条目失败', details: error.message });
+    }
+});
+
+// 删除翻译条目 (DELETE方式)
+app.delete('/api/entries/:Chinese', async (req, res) => {
+    try {
+        const { Chinese } = req.params;
+        
+        if (!Chinese) {
+            return res.status(400).json({ error: '未提供要删除的条目' });
+        }
+        
+        console.log('尝试删除条目 (DELETE方式):', Chinese);
+        
+        // 删除向量存储中的向量
+        if (vectorServiceAvailable) {
+            try {
+                await embeddingService.deleteEmbedding(Chinese);
+            } catch (vectorError) {
+                console.error('删除向量失败:', vectorError);
+                // 继续执行，即使向量删除失败
+            }
+        } else {
+            console.log('向量服务不可用，跳过向量删除');
+        }
+
+        // 从数据库中删除条目
+        const decodedChinese = decodeURIComponent(Chinese); // URL解码
+        
+        console.log('执行SQL删除，解码后条目值:', decodedChinese);
+        
+        // 先检查条目是否存在
+        const [checkResult] = await pool.execute(
+            'SELECT COUNT(*) as count FROM `translate-cn` WHERE Chinese = ?',
+            [decodedChinese]
+        );
+        
+        if (checkResult[0].count === 0) {
+            console.log('未找到要删除的条目:', decodedChinese);
+            return res.status(404).json({ error: '未找到要删除的条目', value: decodedChinese });
+        }
+
+        // 执行删除操作
+        const [result] = await pool.execute(
+            'DELETE FROM `translate-cn` WHERE Chinese = ?',
+            [decodedChinese]
+        );
+
+        if (result.affectedRows === 0) {
+            console.log('删除失败，未找到条目:', decodedChinese);
+            res.status(404).json({ error: '未找到要删除的条目' });
+        } else {
+            console.log('删除条目成功:', decodedChinese, '影响行数:', result.affectedRows);
             res.json({ success: true });
         }
     } catch (error) {
