@@ -1,7 +1,8 @@
 import { QdrantClient } from '@qdrant/js-client-rest';
+import fetch from 'node-fetch';
 
 export interface VectorEntry {
-    id: number;
+    id: string;  
     vector: number[];
     payload?: Record<string, any>;
 }
@@ -9,22 +10,22 @@ export interface VectorEntry {
 export class VectorStoreService {
     private client: QdrantClient;
     private collectionName: string = 'translation_kb';
-    private vectorSize: number = 384; // Default for many embedding models
+    private vectorSize: number = 768; 
+    private ollamaUrl: string;
 
     constructor() {
         this.client = new QdrantClient({
             url: process.env.QDRANT_URL || 'http://localhost:6333',
         });
+        this.ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
     }
 
     async initializeCollection(): Promise<void> {
         try {
-            // Check if collection exists
             const collections = await this.client.getCollections();
             const exists = collections.collections.some(c => c.name === this.collectionName);
 
             if (!exists) {
-                // Create collection if it doesn't exist
                 await this.client.createCollection(this.collectionName, {
                     vectors: {
                         size: this.vectorSize,
@@ -94,7 +95,7 @@ export class VectorStoreService {
         }
     }
 
-    async deleteVector(id: number): Promise<void> {
+    async deleteVector(id: string): Promise<void> {
         try {
             await this.client.delete(this.collectionName, {
                 points: [id],
@@ -106,10 +107,38 @@ export class VectorStoreService {
     }
 
     async getEmbeddingFromText(text: string): Promise<number[]> {
-        // This is a placeholder. In a real application, you would use an embedding model
-        // like OpenAI's text-embedding-ada-002 or a local model to generate embeddings.
-        // For now, we'll just return a random vector of the correct size
-        return Array.from({ length: this.vectorSize }, () => Math.random() - 0.5);
+        try {
+            const response = await fetch(`${this.ollamaUrl}/api/embeddings`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: 'nomic-embed-text',
+                    prompt: text,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            return data.embedding;
+        } catch (error) {
+            console.error('Error getting text embedding vector:', error);
+            throw error;
+        }
+    }
+
+    async searchSimilarByText(text: string, limit: number = 10): Promise<any[]> {
+        try {
+            const vector = await this.getEmbeddingFromText(text);
+            return await this.searchSimilar(vector, limit);
+        } catch (error) {
+            console.error('Error searching similar vectors by text:', error);
+            throw error;
+        }
     }
 }
 

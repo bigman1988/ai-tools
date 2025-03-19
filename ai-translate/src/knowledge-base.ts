@@ -1,10 +1,11 @@
 import './styles.css';
-import { apiService } from './services/api';
+import { ApiService } from './services/api';
 import { TranslationEntry } from './services/database';
-import * as XLSX from 'xlsx';
-import { KnowledgeBaseTableRenderer } from './components/kb-table-renderer';
-import { createLogger } from './utils/kb-utils';
 import { IKnowledgeBaseManager } from './types/kb-types';
+import { KnowledgeBaseModals } from './components/kb-modals';
+import { KnowledgeBaseTableRenderer } from './components/kb-table-renderer';
+import * as XLSX from 'xlsx';
+import { createLogger } from './utils/kb-utils';
 
 // 添加全局实例变量，用于检查是否已经初始化
 declare global {
@@ -16,6 +17,7 @@ declare global {
 export class KnowledgeBaseManager implements IKnowledgeBaseManager {
     private currentEntries: TranslationEntry[] = [];
     private tableRenderer: KnowledgeBaseTableRenderer;
+    private apiService: ApiService;
     
     // DOM元素
     private fileInput!: HTMLInputElement;
@@ -49,15 +51,14 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
             this.deleteEntry.bind(this)
         );
         
+        // 初始化apiService
+        this.apiService = new ApiService(); // 在构造函数中初始化
+        
         // 检查是否已经初始化过，避免重复注册事件监听器
         if (!window.knowledgeBaseManagerInstance) {
             // 初始化事件监听器
-            this.initializeEventListeners();
-            // 初始化API服务
-            this.initializeDatabase();
-            console.log('初始化事件监听器');
-        } else {
-            console.log('检测到已存在实例，跳过事件监听器初始化');
+            this.initialize();
+            window.knowledgeBaseManagerInstance = this;
         }
     }
 
@@ -119,16 +120,21 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
         });
 
         // 搜索按钮事件
-        this.searchBtn.addEventListener('click', () => {
+        this.searchBtn.addEventListener('click', async () => {
             const searchTerm = this.searchInput.value.trim();
-            this.loadEntries(searchTerm);
+            const entries = await this.searchEntries(searchTerm);
+            this.currentEntries = entries;
+            this.tableRenderer.renderTable(entries);
         });
 
         // 搜索输入框回车事件
         this.searchInput.addEventListener('keypress', (event) => {
             if (event.key === 'Enter') {
                 const searchTerm = this.searchInput.value.trim();
-                this.loadEntries(searchTerm);
+                this.searchEntries(searchTerm).then((entries) => {
+                    this.currentEntries = entries;
+                    this.tableRenderer.renderTable(entries);
+                });
             }
         });
 
@@ -157,7 +163,7 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
                         const cleanId = id.replace(/[\r\n]+/g, ' ').trim();
                         console.log(`处理后ID: "${cleanId}"`);
                         
-                        const success = await apiService.deleteEntry(cleanId);
+                        const success = await this.apiService.deleteEntry(cleanId);
                         if (success) {
                             successCount++;
                         } else {
@@ -187,7 +193,7 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
         try {
             // 如果没有搜索词且内存中没有数据，则从数据库加载
             if (!searchTerm && this.currentEntries.length === 0) {
-                const entries = await apiService.getEntries();
+                const entries = await this.apiService.getEntries();
                 this.currentEntries = entries;
                 this.tableRenderer.renderTable(entries);
                 this.log(`加载了 ${entries.length} 条记录`);
@@ -222,6 +228,33 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
     }
 
     /**
+     * 搜索条目
+     */
+    public async searchEntries(searchTerm: string): Promise<TranslationEntry[]> {
+        try {
+            // 如果搜索词为空，获取所有条目
+            if (!searchTerm.trim()) {
+                const entries = await this.apiService.getEntries();
+                return entries;
+            }
+
+            // 使用向量搜索
+            const results = await this.apiService.vectorSearch(searchTerm);
+            if (results && results.length > 0) {
+                // 从结果的payload中提取翻译数据
+                const entries = results.map(result => result.payload);
+                return entries;
+            } else {
+                return [];
+            }
+        } catch (error) {
+            console.error('搜索条目时出错:', error);
+            this.log('搜索条目失败', 'error');
+            return [];
+        }
+    }
+
+    /**
      * 删除条目
      */
     public async deleteEntry(chinese: string): Promise<void> {
@@ -229,7 +262,7 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
         if (!confirmDelete) return;
         
         try {
-            const success = await apiService.deleteEntry(chinese);
+            const success = await this.apiService.deleteEntry(chinese);
             
             if (success) {
                 this.log('删除成功');
@@ -364,163 +397,41 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
     /**
      * 导入文件
      */
-    private importFile(file: File): void {
+    public async importFile(file: File): Promise<void> {
         try {
-            // 先处理Excel文件
-            this.log(`开始处理Excel文件: ${file.name}`);
-            this.processExcelFile(file);
+            this.log('开始导入文件...');
             
-            // 显示进度条
-            this.progressFill.style.width = '0%';
-            this.progressText.textContent = '0%';
-            this.progressDetails.textContent = '准备导入...';
-            this.progressDetails.style.display = 'block';
+            // 检查文件类型
+            if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+                this.log('只支持.xlsx或.xls格式的Excel文件', 'error');
+                return;
+            }
+
+            // 开始导入
+            const result = await this.apiService.importExcel(file);
             
-            // 等待Excel处理完成
-            setTimeout(async () => {
-                // 获取所有条目
-                const entries = this.currentEntries;
-                
-                if (entries.length === 0) {
-                    this.log('没有数据可导入', 'error');
-                    return;
-                }
-                
-                // 开始导入前，先获取现有条目进行比对
-                this.log('获取现有条目进行比对...');
-                const existingEntries = await apiService.getEntries();
-                const existingChineseMap = new Map();
-                existingEntries.forEach(entry => {
-                    existingChineseMap.set(entry.Chinese, entry);
-                });
-                
-                // 分类条目
-                const newEntries = entries.filter(entry => !existingChineseMap.has(entry.Chinese));
-                const duplicateEntries = entries.filter(entry => existingChineseMap.has(entry.Chinese));
-                
-                if (duplicateEntries.length > 0) {
-                    this.log(`发现 ${duplicateEntries.length} 条已存在的条目，将进行字段级别比较和更新`, 'warning');
-                }
-                
-                if (newEntries.length === 0 && duplicateEntries.length === 0) {
-                    this.log('没有需要导入或更新的条目', 'warning');
-                    return;
-                }
-                
-                // 开始导入新条目和更新已存在条目
-                this.log(`开始导入 ${newEntries.length} 条新记录，更新 ${duplicateEntries.length} 条已存在记录`);
-                
-                // 批量导入
-                const batchSize = 1; // 改为逐条导入，以便精确记录每条记录的错误
-                let successCount = 0;
-                let failCount = 0;
-                let updateCount = 0;
-                const failedEntries: { entry: TranslationEntry, error: string }[] = [];
-                
-                const importBatch = async (startIndex: number) => {
-                    if (startIndex >= newEntries.length + duplicateEntries.length) {
-                        // 导入完成
-                        const totalProcessed = successCount + failCount + updateCount;
-                        this.log(`导入完成，成功: ${successCount}，失败: ${failCount}，更新: ${updateCount}，总计: ${totalProcessed}`);
-                        
-                        // 显示失败的条目详情
-                        if (failCount > 0) {
-                            this.log(`失败条目详情：`, 'error');
-                            failedEntries.forEach((item, index) => {
-                                this.log(`${index + 1}. 条目: "${item.entry.Chinese}" 失败原因: ${item.error}`, 'error');
-                            });
-                        }
-                        
-                        // 刷新数据
-                        await this.loadEntries();
-                        return;
-                    }
-                    
-                    const endIndex = Math.min(startIndex + batchSize, newEntries.length + duplicateEntries.length);
-                    const batch = startIndex < newEntries.length ? newEntries.slice(startIndex, endIndex) : duplicateEntries.slice(startIndex - newEntries.length, endIndex - newEntries.length);
-                    
-                    try {
-                        // 逐条处理，以便记录每条的错误
-                        for (const entry of batch) {
-                            try {
-                                if (startIndex < newEntries.length) {
-                                    // 新条目导入
-                                    await apiService.addEntry(entry);
-                                    successCount++;
-                                } else {
-                                    // 已存在条目更新
-                                    const existingEntry = existingChineseMap.get(entry.Chinese);
-                                    if (existingEntry) {
-                                        // 进行字段级别比较和更新
-                                        const updatedEntry: Partial<TranslationEntry> = {};
-                                        let needUpdate = false;
-                                        
-                                        // 遍历所有字段，只更新有内容的字段
-                                        Object.keys(entry).forEach(key => {
-                                            // 如果导入数据有内容且与现有数据不同
-                                            if (entry[key] && entry[key] !== existingEntry[key]) {
-                                                // 如果现有数据为空或者两者都有内容但不同
-                                                if (!existingEntry[key] || (entry[key] && existingEntry[key])) {
-                                                    updatedEntry[key] = entry[key];
-                                                    needUpdate = true;
-                                                }
-                                            }
-                                        });
-                                        
-                                        if (needUpdate) {
-                                            await apiService.updateEntry(entry.Chinese, updatedEntry);
-                                            this.log(`更新条目: "${entry.Chinese}"`, 'info');
-                                            updateCount++;
-                                        } else {
-                                            this.log(`无需更新条目: "${entry.Chinese}"`, 'info');
-                                        }
-                                    } else {
-                                        // 这是一个重复条目错误，记录为警告而不是错误
-                                        this.log(`跳过重复条目: "${entry.Chinese}"`, 'warning');
-                                    }
-                                }
-                            } catch (error) {
-                                const errorMessage = (error as Error).message || '未知错误';
-                                
-                                // 检查是否是重复条目错误
-                                if (errorMessage.includes('409') && errorMessage.includes('条目已存在')) {
-                                    // 这是一个重复条目错误，记录为警告而不是错误
-                                    this.log(`跳过重复条目: "${entry.Chinese}"`, 'warning');
-                                } else {
-                                    // 其他类型的错误
-                                    failCount++;
-                                    failedEntries.push({ entry, error: errorMessage });
-                                    this.log(`导入失败: "${entry.Chinese}", 原因: ${errorMessage}`, 'error');
-                                }
-                            }
-                        }
-                    } catch (error) {
-                        // 批处理整体失败的情况
-                        failCount += batch.length;
-                        const errorMessage = (error as Error).message || '未知错误';
-                        this.log(`批量导入失败: ${errorMessage}`, 'error');
-                        batch.forEach(entry => {
-                            failedEntries.push({ entry, error: errorMessage });
-                        });
-                    }
-                    
-                    // 更新进度
-                    const progress = Math.round((endIndex + duplicateEntries.length) / (newEntries.length + duplicateEntries.length) * 100);
-                    this.progressFill.style.width = `${progress}%`;
-                    this.progressText.textContent = `${progress}%`;
-                    this.progressDetails.textContent = `已处理 ${endIndex + duplicateEntries.length} / ${newEntries.length + duplicateEntries.length} 条记录，成功: ${successCount}，失败: ${failCount}，更新: ${updateCount}`;
-                    
-                    // 处理下一批
-                    setTimeout(() => importBatch(endIndex), 0);
-                };
-                
-                // 开始导入第一批
-                importBatch(0);
-            }, 500); // 给Excel处理一些时间
-            
+            if (result.success) {
+                this.log(`成功导入 ${result.count} 条记录`, 'info');
+                // 刷新数据
+                await this.loadEntries();
+            } else {
+                this.log('导入失败', 'error');
+            }
         } catch (error) {
-            this.log(`导入失败: ${(error as Error).message}`, 'error');
+            console.error('导入文件时出错:', error);
+            this.log('导入文件失败', 'error');
         }
+    }
+
+    /**
+     * 初始化
+     */
+    public initialize(): void {
+        // 初始化事件监听器
+        this.initializeEventListeners();
+        
+        // 初始化数据库连接
+        this.initializeDatabase();
     }
 
     /**

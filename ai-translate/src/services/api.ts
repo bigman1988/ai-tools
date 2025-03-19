@@ -1,10 +1,9 @@
-import { TranslationEntry } from './database';
+import { TranslationEntry } from '../types';
 
-class ApiService {
+export class ApiService {
     private baseUrl: string;
 
     constructor() {
-        // 使用相对URL，假设API服务器和前端在同一个域名下的不同端口
         this.baseUrl = 'http://localhost:3000/api';
     }
 
@@ -21,16 +20,11 @@ class ApiService {
         }
     }
 
-    async getEntries(searchTerm?: string, limit: number = 100, offset: number = 0): Promise<TranslationEntry[]> {
+    async getEntries(searchTerm?: string): Promise<TranslationEntry[]> {
         try {
-            let url = `${this.baseUrl}/entries?limit=${limit}&offset=${offset}`;
-            if (searchTerm) {
-                url += `&search=${encodeURIComponent(searchTerm)}`;
-            }
-
-            const response = await fetch(url);
+            const response = await fetch(`${this.baseUrl}/entries${searchTerm ? `?search=${searchTerm}` : ''}`);
             if (!response.ok) {
-                throw new Error(`获取条目失败: ${response.status}`);
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
             return await response.json();
         } catch (error) {
@@ -39,26 +33,45 @@ class ApiService {
         }
     }
 
-    async addEntry(entry: Partial<TranslationEntry>): Promise<boolean> {
+    async vectorSearch(text: string, limit: number = 10): Promise<Array<{
+        id: string;
+        score: number;
+        payload: TranslationEntry;
+    }>> {
+        try {
+            const response = await fetch(`${this.baseUrl}/vector-search`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ text, limit }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('向量搜索失败:', error);
+            throw error;
+        }
+    }
+
+    async addEntry(entry: TranslationEntry): Promise<boolean> {
         try {
             const response = await fetch(`${this.baseUrl}/entries`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(entry)
+                body: JSON.stringify(entry),
             });
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: '未知错误' }));
-                throw new Error(`添加条目失败: ${response.status}, 详情: ${errorData.details || errorData.error || '未知错误'}`);
-            }
-
-            const result = await response.json();
-            return result.success;
+            return response.ok;
         } catch (error) {
             console.error('添加条目失败:', error);
-            throw error;
+            return false;
         }
     }
 
@@ -67,54 +80,38 @@ class ApiService {
             const response = await fetch(`${this.baseUrl}/entries/${encodeURIComponent(chinese)}`, {
                 method: 'PUT',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(entry)
+                body: JSON.stringify(entry),
             });
 
-            if (!response.ok) {
-                throw new Error(`更新条目失败: ${response.status}`);
-            }
-
-            const result = await response.json();
-            return result.success;
+            return response.ok;
         } catch (error) {
             console.error('更新条目失败:', error);
-            throw error;
+            return false;
         }
     }
 
-    /**
-     * 删除一个翻译条目
-     * @param id 条目ID（中文）
-     * @returns 是否删除成功
-     */
-    async deleteEntry(id: string): Promise<boolean> {
+    async deleteEntry(chinese: string): Promise<boolean> {
         try {
-            console.log(`API服务 - 删除条目，原始ID: "${id}"`);
-            
-            // 使用POST请求发送删除请求，将ID放在请求体中
-            // 注意：我们不再对ID进行任何预处理，保留所有原始字符
-            const response = await fetch(`${this.baseUrl}/entries/delete`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ id })
+            console.log(`API服务 - 删除条目，原始ID: "${chinese}"`);
+            const cleanId = chinese.replace(/[\r\n]+/g, ' ').trim();
+            console.log(`API服务 - 删除条目，处理后ID: "${cleanId}"`);
+
+            const response = await fetch(`${this.baseUrl}/entries/${encodeURIComponent(cleanId)}`, {
+                method: 'DELETE',
             });
-            
+
             if (!response.ok) {
-                const errorData = await response.json();
-                console.error('删除条目失败:', errorData);
-                throw new Error(`删除条目失败: ${response.status}`);
+                console.error(`API服务 - 删除条目失败，状态码: ${response.status}`);
+                return false;
             }
-            
-            const data = await response.json();
-            console.log('删除条目成功:', data);
+
+            console.log('API服务 - 删除条目成功');
             return true;
         } catch (error) {
-            console.error('删除条目出错:', error);
-            throw error;
+            console.error('删除条目失败:', error);
+            return false;
         }
     }
 
@@ -125,17 +122,18 @@ class ApiService {
 
             const response = await fetch(`${this.baseUrl}/import`, {
                 method: 'POST',
-                body: formData
+                body: formData,
             });
 
             if (!response.ok) {
-                throw new Error(`导入Excel失败: ${response.status}`);
+                throw new Error(`导入失败: ${response.status}`);
             }
 
-            return await response.json();
+            const result = await response.json();
+            return { success: true, count: result.count || 0 };
         } catch (error) {
             console.error('导入Excel失败:', error);
-            throw error;
+            return { success: false, count: 0 };
         }
     }
 
@@ -152,7 +150,6 @@ class ApiService {
         }
     }
 
-    // 初始化数据库连接 - 在客户端这只是一个检查API服务器是否可用的方法
     async initializeDatabase(): Promise<void> {
         try {
             await this.getStatus();

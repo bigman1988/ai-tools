@@ -13,11 +13,31 @@ export interface ModalConfig {
     entry?: TranslationEntry;
 }
 
-// 知识库管理器接口
+/**
+ * 知识库管理器接口
+ */
 export interface IKnowledgeBaseManager {
-    loadEntries(searchTerm?: string): Promise<void>;
     /**
      * 记录日志
+     * @param message 日志消息
+     * @param type 日志类型
      */
-    log(message: string, type: 'info' | 'warning' | 'error'): void;
+    log(message: string, type?: 'info' | 'warning' | 'error'): void;
+
+    /**
+     * 加载翻译条目
+     */
+    loadEntries(): Promise<void>;
+
+    /**
+     * 导入Excel文件
+     * @param file Excel文件
+     */
+    importFile(file: File): Promise<void>;
+
+    /**
+     * 搜索翻译条目
+     * @param searchTerm 搜索关键词
+     */
+    searchEntries(searchTerm: string): Promise<TranslationEntry[]>;
 }

@@ -1,7 +1,7 @@
 import mysql from 'mysql2/promise';
 
+// 翻译条目的类型定义
 export interface TranslationEntry {
-    id?: number;
     Chinese: string;
     English: string;
     Japanese: string;
@@ -14,8 +14,7 @@ export interface TranslationEntry {
     Italian: string;
     Indonesian: string;
     Portuguese: string;
-    created_at?: Date;
-    updated_at?: Date;
+    vector_id?: string;
 }
 
 export class DatabaseService {
@@ -51,6 +50,7 @@ export class DatabaseService {
                     Italian TEXT,
                     Indonesian TEXT,
                     Portuguese TEXT,
+                    vector_id TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 )
@@ -65,20 +65,21 @@ export class DatabaseService {
     async addEntry(entry: TranslationEntry): Promise<number> {
         try {
             const [result] = await this.pool.execute(
-                'INSERT INTO `translate-cn` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                'INSERT INTO `translate-cn` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese, vector_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 [
-                    entry.Chinese || '',
-                    entry.English || '',
-                    entry.Japanese || '',
-                    entry.Korean || '',
-                    entry.Spanish || '',
-                    entry.French || '',
-                    entry.German || '',
-                    entry.Russian || '',
-                    entry.Thai || '',
-                    entry.Italian || '',
-                    entry.Indonesian || '',
-                    entry.Portuguese || ''
+                    entry.Chinese,
+                    entry.English,
+                    entry.Japanese,
+                    entry.Korean,
+                    entry.Spanish,
+                    entry.French,
+                    entry.German,
+                    entry.Russian,
+                    entry.Thai,
+                    entry.Italian,
+                    entry.Indonesian,
+                    entry.Portuguese,
+                    entry.vector_id || ''
                 ]
             );
             return (result as mysql.ResultSetHeader).insertId;
@@ -125,7 +126,7 @@ export class DatabaseService {
 
             const columns = [
                 'Chinese', 'English', 'Japanese', 'Korean', 'Spanish', 'French',
-                'German', 'Russian', 'Thai', 'Italian', 'Indonesian', 'Portuguese'
+                'German', 'Russian', 'Thai', 'Italian', 'Indonesian', 'Portuguese', 'vector_id'
             ];
 
             for (const column of columns) {
@@ -172,24 +173,25 @@ export class DatabaseService {
                 return 0;
             }
 
-            const placeholders = entries.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
+            const placeholders = entries.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
             const values = entries.flatMap(entry => [
-                entry.Chinese || '',
-                entry.English || '',
-                entry.Japanese || '',
-                entry.Korean || '',
-                entry.Spanish || '',
-                entry.French || '',
-                entry.German || '',
-                entry.Russian || '',
-                entry.Thai || '',
-                entry.Italian || '',
-                entry.Indonesian || '',
-                entry.Portuguese || ''
+                entry.Chinese,
+                entry.English,
+                entry.Japanese,
+                entry.Korean,
+                entry.Spanish,
+                entry.French,
+                entry.German,
+                entry.Russian,
+                entry.Thai,
+                entry.Italian,
+                entry.Indonesian,
+                entry.Portuguese,
+                entry.vector_id || ''
             ]);
 
             const [result] = await this.pool.execute(
-                `INSERT INTO \`translate-cn\` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese) VALUES ${placeholders}`,
+                `INSERT INTO \`translate-cn\` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese, vector_id) VALUES ${placeholders}`,
                 values
             );
 

@@ -1,3 +1,5 @@
+import { TranslationEntry } from '../services/database';
+
 /**
  * 知识库管理器工具函数
  */
@@ -14,7 +16,12 @@ export function escapeHtml(text: string): string {
 }
 
 // 定义语言字段映射，避免重复代码
-export const languageFields = [
+export interface LanguageField {
+    key: keyof TranslationEntry;
+    label: string;
+}
+
+export const languageFields: LanguageField[] = [
     { key: 'Chinese', label: '中文' },
     { key: 'English', label: '英文' },
     { key: 'Japanese', label: '日文' },

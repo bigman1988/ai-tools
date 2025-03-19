@@ -1,6 +1,6 @@
 import { TranslationEntry } from '../services/database';
-import { apiService } from '../services/api';
-import { languageFields, escapeHtml } from '../utils/kb-utils';
+import { ApiService } from '../services/api';
+import { languageFields } from '../utils/kb-utils';
 import { IKnowledgeBaseManager } from '../types/kb-types';
 
 /**
@@ -8,9 +8,11 @@ import { IKnowledgeBaseManager } from '../types/kb-types';
  */
 export class KnowledgeBaseModals {
     private manager: IKnowledgeBaseManager;
+    private apiService: ApiService;
 
     constructor(manager: IKnowledgeBaseManager) {
         this.manager = manager;
+        this.apiService = new ApiService();
     }
 
     /**
@@ -28,11 +30,11 @@ export class KnowledgeBaseModals {
         `;
         
         languageFields.forEach(field => {
-            const value = entry[field.key as keyof TranslationEntry];
+            const value = entry[field.key];
             content += `
                 <div class="entry-field">
                     <label>${field.label}:</label>
-                    <div class="field-value">${escapeHtml(value?.toString() || '')}</div>
+                    <div class="field-value">${value || ''}</div>
                 </div>
             `;
         });
@@ -71,11 +73,11 @@ export class KnowledgeBaseModals {
         
         // 添加所有可编辑字段
         languageFields.forEach(field => {
-            const value = entry[field.key as keyof TranslationEntry];
+            const value = entry[field.key];
             content += `
                 <div class="form-group">
                     <label for="${field.key}">${field.label}:</label>
-                    <textarea id="${field.key}" class="form-control" rows="2">${escapeHtml(value?.toString() || '')}</textarea>
+                    <textarea id="${field.key}" class="form-control" rows="2">${value || ''}</textarea>
                 </div>
             `;
         });
@@ -119,12 +121,14 @@ export class KnowledgeBaseModals {
             // 收集表单数据
             languageFields.forEach(field => {
                 const input = document.getElementById(field.key) as HTMLTextAreaElement;
-                (updatedEntry as any)[field.key] = input.value;
+                if (input && input.value) {
+                    updatedEntry[field.key] = input.value;
+                }
             });
             
             try {
                 // 使用API服务更新条目
-                await apiService.updateEntry(entryChinese, updatedEntry);
+                await this.apiService.updateEntry(entryChinese, updatedEntry);
                 this.manager.log('条目更新成功', 'info');
                 document.body.removeChild(modal);
                 
@@ -198,12 +202,20 @@ export class KnowledgeBaseModals {
             // 收集表单数据
             languageFields.forEach(field => {
                 const input = document.getElementById(field.key) as HTMLTextAreaElement;
-                (newEntry as any)[field.key] = input.value;
+                if (input && input.value) {
+                    newEntry[field.key] = input.value;
+                }
             });
+
+            // 验证必填字段
+            if (!newEntry.Chinese) {
+                this.manager.log('中文字段不能为空', 'error');
+                return;
+            }
             
             try {
                 // 使用API服务添加条目
-                await apiService.addEntry(newEntry);
+                await this.apiService.addEntry(newEntry as TranslationEntry);
                 this.manager.log('条目添加成功', 'info');
                 document.body.removeChild(modal);
                 
