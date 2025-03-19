@@ -55,9 +55,9 @@ const pool = mysql.createPool({
 // 初始化数据库
 async function initializeDatabase() {
     try {
-        // 创建translate-cn表（如果不存在）
+        // 创建translate表（如果不存在）
         await pool.execute(`
-            CREATE TABLE IF NOT EXISTS \`translate-cn\` (
+            CREATE TABLE IF NOT EXISTS \`translate\` (
                 Chinese VARCHAR(255) PRIMARY KEY,
                 English TEXT,
                 Japanese TEXT,
@@ -70,7 +70,7 @@ async function initializeDatabase() {
                 Italian TEXT,
                 Indonesian TEXT,
                 Portuguese TEXT,
-                vector_id VARCHAR(255),
+                vector_id JSON,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             )
@@ -87,7 +87,7 @@ let vectorServiceAvailable = false;
 (async () => {
     try {
         const initResult = await embeddingService.initializeCollection();
-        vectorServiceAvailable = false;//initResult;
+        vectorServiceAvailable = initResult;
         if (initResult) {
             console.log('向量存储初始化成功');
         } else {
@@ -124,7 +124,7 @@ app.get('/api/entries', async (req, res) => {
                         // 构建 IN 查询
                         const placeholders = chineseKeys.map(() => '?').join(',');
                         const [rows] = await pool.execute(
-                            `SELECT * FROM \`translate-cn\` WHERE Chinese IN (${placeholders})`,
+                            `SELECT * FROM \`translate\` WHERE Chinese IN (${placeholders})`,
                             chineseKeys
                         );
                         
@@ -149,7 +149,7 @@ app.get('/api/entries', async (req, res) => {
         }
         
         // 普通数据库查询
-        let query = 'SELECT * FROM `translate-cn` WHERE 1=1';
+        let query = 'SELECT * FROM `translate` WHERE 1=1';
         const params = [];
         
         if (search) {
@@ -188,7 +188,7 @@ app.post('/api/entries', async (req, res) => {
         
         // 检查是否已存在相同的中文条目
         const [existingEntries] = await pool.execute(
-            'SELECT Chinese FROM `translate-cn` WHERE Chinese = ?',
+            'SELECT Chinese FROM `translate` WHERE Chinese = ?',
             [entry.Chinese]
         );
         
@@ -200,24 +200,57 @@ app.post('/api/entries', async (req, res) => {
         }
         
         // 生成向量并存储到向量数据库
-        let vectorId = null;
+        let chineseVectorId = null;
+        let englishVectorId = null;
+        
         if (vectorServiceAvailable) {
             try {
-                // 获取文本的向量嵌入
-                const vector = await embeddingService.generateEmbedding(entry.Chinese);
-                
-                // 存储向量到Qdrant
-                const success = await embeddingService.storeEmbedding(
-                    entry.Chinese,
-                    entry.Chinese,
-                    { 
-                        Chinese: entry.Chinese,
-                        English: entry.English || '' 
+                // 为中文和英文分别创建向量
+                if (entry.Chinese) {
+                    console.log(`创建中文向量: ${entry.Chinese}`);
+                    const chineseResult = await embeddingService.storeEmbedding(
+                        entry.Chinese,
+                        {
+                            Chinese: entry.Chinese,
+                            English: entry.English || '',
+                            type: 'chinese'
+                        }
+                    );
+                    
+                    if (chineseResult.success) {
+                        chineseVectorId = chineseResult.id;
+                        console.log(`中文向量ID: ${chineseVectorId}`);
+                    } else {
+                        console.error(`创建中文向量失败: ${entry.Chinese}`);
                     }
-                );
+                }
                 
-                if (success) {
-                    vectorId = entry.Chinese;
+                if (entry.English) {
+                    console.log(`创建英文向量: ${entry.English}`);
+                    const englishResult = await embeddingService.storeEmbedding(
+                        entry.English,
+                        {
+                            Chinese: entry.Chinese,
+                            English: entry.English,
+                            type: 'english'
+                        }
+                    );
+                    
+                    if (englishResult.success) {
+                        englishVectorId = englishResult.id;
+                        console.log(`英文向量ID: ${englishVectorId}`);
+                    } else {
+                        console.error(`创建英文向量失败: ${entry.English}`);
+                    }
+                }
+                
+                // 使用JSON存储两种向量ID
+                if (chineseVectorId || englishVectorId) {
+                    const vectorIds = {
+                        chinese: chineseVectorId,
+                        english: englishVectorId
+                    };
+                    entry.vector_id = JSON.stringify(vectorIds);
                 }
             } catch (vectorError) {
                 console.error('向量处理失败:', vectorError);
@@ -230,7 +263,7 @@ app.post('/api/entries', async (req, res) => {
         // 插入新条目
         try {
             const [result] = await pool.execute(
-                'INSERT INTO `translate-cn` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese, vector_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                'INSERT INTO `translate` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese, vector_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 [
                     entry.Chinese || '',
                     entry.English || '',
@@ -244,7 +277,7 @@ app.post('/api/entries', async (req, res) => {
                     entry.Italian || '',
                     entry.Indonesian || '',
                     entry.Portuguese || '',
-                    vectorId
+                    entry.vector_id
                 ]
             );
             
@@ -309,20 +342,55 @@ app.put('/api/entries/:Chinese', async (req, res) => {
         // 更新向量存储
         if (vectorServiceAvailable) {
             try {
-                // 更新向量
-                const success = await embeddingService.storeEmbedding(
-                    Chinese,
+                // 为中文和英文分别创建向量
+                let chineseVectorId = null;
+                let englishVectorId = null;
+                
+                // 更新中文向量
+                const chineseResult = await embeddingService.storeEmbedding(
                     Chinese,
                     {
                         Chinese: Chinese,
-                        English: entry.English || ''
+                        English: entry.English || '',
+                        type: 'chinese'
                     }
                 );
                 
+                if (chineseResult.success) {
+                    chineseVectorId = chineseResult.id;
+                    console.log(`中文向量ID: ${chineseVectorId}`);
+                } else {
+                    console.error(`更新中文向量失败: ${Chinese}`);
+                }
+                
+                // 如果有英文内容，更新英文向量
+                if (entry.English) {
+                    const englishResult = await embeddingService.storeEmbedding(
+                        entry.English,
+                        {
+                            Chinese: Chinese,
+                            English: entry.English,
+                            type: 'english'
+                        }
+                    );
+                    
+                    if (englishResult.success) {
+                        englishVectorId = englishResult.id;
+                        console.log(`英文向量ID: ${englishVectorId}`);
+                    } else {
+                        console.error(`更新英文向量失败: ${entry.English}`);
+                    }
+                }
+                
                 // 添加vector_id字段更新
-                if (success) {
+                if (chineseVectorId || englishVectorId) {
                     fields.push('vector_id = ?');
-                    values.push(Chinese);
+                    // 使用JSON存储两种向量ID
+                    const vectorIds = {
+                        chinese: chineseVectorId,
+                        english: englishVectorId
+                    };
+                    values.push(JSON.stringify(vectorIds));
                 }
             } catch (vectorError) {
                 console.error('向量更新失败:', vectorError);
@@ -335,7 +403,7 @@ app.put('/api/entries/:Chinese', async (req, res) => {
         values.push(Chinese); // 添加WHERE条件的值
 
         const query = `
-            UPDATE \`translate-cn\`
+            UPDATE \`translate\`
             SET ${fields.join(', ')}
             WHERE Chinese = ?
         `;
@@ -367,7 +435,33 @@ app.post('/api/entries/delete', async (req, res) => {
         // 删除向量存储中的向量
         if (vectorServiceAvailable) {
             try {
-                await embeddingService.deleteEmbedding(Chinese);
+                // 从数据库获取向量ID
+                const [vectorResult] = await pool.execute(
+                    'SELECT vector_id FROM `translate` WHERE Chinese = ?',
+                    [Chinese]
+                );
+                
+                if (vectorResult.length > 0 && vectorResult[0].vector_id) {
+                    try {
+                        const vectorIds = JSON.parse(vectorResult[0].vector_id);
+                        
+                        // 删除中文向量
+                        if (vectorIds.chinese) {
+                            const chineseResult = await embeddingService.deleteEmbedding(vectorIds.chinese);
+                            console.log(`删除中文向量${chineseResult ? '成功' : '失败'}: ${vectorIds.chinese}`);
+                        }
+                        
+                        // 删除英文向量
+                        if (vectorIds.english) {
+                            const englishResult = await embeddingService.deleteEmbedding(vectorIds.english);
+                            console.log(`删除英文向量${englishResult ? '成功' : '失败'}: ${vectorIds.english}`);
+                        }
+                    } catch (parseError) {
+                        console.error('解析向量ID失败:', parseError);
+                    }
+                } else {
+                    console.log('未找到向量ID，跳过向量删除');
+                }
             } catch (vectorError) {
                 console.error('删除向量失败:', vectorError);
                 // 继续执行，即使向量删除失败
@@ -383,7 +477,7 @@ app.post('/api/entries/delete', async (req, res) => {
         
         // 先检查条目是否存在
         const [checkResult] = await pool.execute(
-            'SELECT COUNT(*) as count FROM `translate-cn` WHERE Chinese = ?',
+            'SELECT COUNT(*) as count FROM `translate` WHERE Chinese = ?',
             [encodedChinese]
         );
         
@@ -394,7 +488,7 @@ app.post('/api/entries/delete', async (req, res) => {
 
         // 执行删除操作
         const [result] = await pool.execute(
-            'DELETE FROM `translate-cn` WHERE Chinese = ?',
+            'DELETE FROM `translate` WHERE Chinese = ?',
             [encodedChinese]
         );
 
@@ -425,7 +519,33 @@ app.delete('/api/entries/:Chinese', async (req, res) => {
         // 删除向量存储中的向量
         if (vectorServiceAvailable) {
             try {
-                await embeddingService.deleteEmbedding(Chinese);
+                // 从数据库获取向量ID
+                const [vectorResult] = await pool.execute(
+                    'SELECT vector_id FROM `translate` WHERE Chinese = ?',
+                    [decodeURIComponent(Chinese)]
+                );
+                
+                if (vectorResult.length > 0 && vectorResult[0].vector_id) {
+                    try {
+                        const vectorIds = JSON.parse(vectorResult[0].vector_id);
+                        
+                        // 删除中文向量
+                        if (vectorIds.chinese) {
+                            const chineseResult = await embeddingService.deleteEmbedding(vectorIds.chinese);
+                            console.log(`删除中文向量${chineseResult ? '成功' : '失败'}: ${vectorIds.chinese}`);
+                        }
+                        
+                        // 删除英文向量
+                        if (vectorIds.english) {
+                            const englishResult = await embeddingService.deleteEmbedding(vectorIds.english);
+                            console.log(`删除英文向量${englishResult ? '成功' : '失败'}: ${vectorIds.english}`);
+                        }
+                    } catch (parseError) {
+                        console.error('解析向量ID失败:', parseError);
+                    }
+                } else {
+                    console.log('未找到向量ID，跳过向量删除');
+                }
             } catch (vectorError) {
                 console.error('删除向量失败:', vectorError);
                 // 继续执行，即使向量删除失败
@@ -441,7 +561,7 @@ app.delete('/api/entries/:Chinese', async (req, res) => {
         
         // 先检查条目是否存在
         const [checkResult] = await pool.execute(
-            'SELECT COUNT(*) as count FROM `translate-cn` WHERE Chinese = ?',
+            'SELECT COUNT(*) as count FROM `translate` WHERE Chinese = ?',
             [decodedChinese]
         );
         
@@ -452,7 +572,7 @@ app.delete('/api/entries/:Chinese', async (req, res) => {
 
         // 执行删除操作
         const [result] = await pool.execute(
-            'DELETE FROM `translate-cn` WHERE Chinese = ?',
+            'DELETE FROM `translate` WHERE Chinese = ?',
             [decodedChinese]
         );
 
@@ -479,8 +599,8 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
         return res.status(400).json({ error: '没有上传文件' });
     }
 
-    console.log(`接收到文件: ${req.file.originalname}, 大小: ${req.file.size} 字节, MIME类型: ${req.file.mimetype}`);
-    console.log('文件信息:', JSON.stringify(req.file, null, 2));
+    //console.log(`接收到文件: ${req.file.originalname}, 大小: ${req.file.size} 字节, MIME类型: ${req.file.mimetype}`);
+    //console.log('文件信息:', JSON.stringify(req.file, null, 2));
 
     try {
         console.log('开始解析Excel文件');
@@ -497,14 +617,31 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
         const originalRange = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
         console.log('原始数据范围:', originalRange);
         
-        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-        range.s.r = 6; // 从第7行开始
-        worksheet['!ref'] = XLSX.utils.encode_range(range);
-        console.log('调整后数据范围:', range);
+        // 修改：使用更可靠的方式读取Excel数据
+        // 首先读取所有数据
+        const allRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+        console.log(`Excel总行数: ${allRows.length}`);
         
-        // 获取数据
-        const rows = XLSX.utils.sheet_to_json(worksheet);
-        console.log(`解析到 ${rows.length} 行数据`);
+        // 从第7行开始截取数据（索引从0开始，所以第7行是索引6）
+        const dataRows = allRows.slice(6);
+        console.log(`有效数据行数: ${dataRows.length}`);
+        
+        // 获取表头（第2行，索引1）
+        const headers = allRows.length > 1 ? allRows[1] : [];
+        console.log('表头:', headers);
+        
+        // 将数据行转换为对象数组
+        const rows = dataRows.map(row => {
+            const obj = {};
+            headers.forEach((header, index) => {
+                if (header && row[index] !== undefined) {
+                    obj[header] = row[index];
+                }
+            });
+            return obj;
+        }).filter(row => Object.keys(row).length > 0); // 过滤掉空行
+        
+        console.log(`解析到 ${rows.length} 行有效数据`);
         if (rows.length > 0) {
             console.log('第一行数据示例:', JSON.stringify(rows[0], null, 2));
         }
@@ -526,131 +663,200 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
         };
 
         let importedCount = 0;
+        let updatedCount = 0;
+        let skippedCount = 0;
         console.log('准备获取数据库连接');
         const connection = await pool.getConnection();
         console.log('成功获取数据库连接');
-        
-        // 准备批量向量处理
-        const vectorBatch = [];
 
         try {
             await connection.beginTransaction();
             console.log('开始数据库事务');
             
-            // 准备向量处理
-            if (vectorServiceAvailable) {
-                console.log('向量服务可用，开始批量处理');
-                try {
-                    // 使用批量处理而不是单个处理，提高性能
-                    const batchSize = 10; // 每批处理的数量
-                    const batches = [];
-                    
-                    // 将条目分组为批次
-                    for (let i = 0; i < rows.length; i += batchSize) {
-                        batches.push(rows.slice(i, i + batchSize));
+            // 处理所有行数据
+            for (const row of rows) {
+                const entry = {};
+                
+                // 映射字段
+                for (const [excelField, dbField] of Object.entries(fieldMapping)) {
+                    if (row[excelField] !== undefined) {
+                        entry[dbField] = String(row[excelField]).trim();
                     }
-                    console.log(`将数据分为 ${batches.length} 个批次进行处理`);
+                }
+                
+                // 验证必填字段
+                if (!entry.Chinese) {
+                    console.log('跳过没有中文的行');
+                    skippedCount++;
+                    continue; // 跳过没有中文的行
+                }
+                
+                try {
+                    // 1. 检查MySQL中是否已存在该条目
+                    const [existingEntries] = await connection.execute(
+                        'SELECT * FROM `translate` WHERE Chinese = ?',
+                        [entry.Chinese]
+                    );
                     
-                    // 逐批处理
-                    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-                        const batch = batches[batchIndex];
-                        console.log(`处理批次 ${batchIndex + 1}/${batches.length}, 包含 ${batch.length} 条数据`);
+                    const entryExists = existingEntries.length > 0;
+                    const existingEntry = entryExists ? existingEntries[0] : null;
+                    
+                    // 2. 根据是否存在决定更新策略
+                    if (entryExists) {
+                        console.log(`条目已存在: ${entry.Chinese}，准备检查字段更新`);
                         
-                        const promises = batch.map(async (row) => {
-                            const entry = {};
+                        // 检查哪些字段需要更新
+                        const fieldsToUpdate = [];
+                        const updateValues = [];
+                        
+                        for (const field of Object.values(fieldMapping)) {
+                            if (field === 'Chinese') continue; // 中文是主键，不更新
                             
-                            // 映射字段
-                            for (const [excelField, dbField] of Object.entries(fieldMapping)) {
-                                if (row[excelField] !== undefined) {
-                                    entry[dbField] = String(row[excelField]).trim();
+                            // 如果Excel中有值，而数据库中没有值或值不同，则更新
+                            if (entry[field] && (!existingEntry[field] || existingEntry[field] !== entry[field])) {
+                                fieldsToUpdate.push(`${field} = ?`);
+                                updateValues.push(entry[field]);
+                            }
+                        }
+                        
+                        // 如果有字段需要更新
+                        if (fieldsToUpdate.length > 0) {
+                            console.log(`需要更新 ${fieldsToUpdate.length} 个字段: ${entry.Chinese}`);
+                            
+                            // 先处理向量数据
+                            if (vectorServiceAvailable) {
+                                // 为中文和英文分别创建向量
+                                let chineseVectorId = null;
+                                let englishVectorId = null;
+                                
+                                if (entry.Chinese) {
+                                    console.log(`更新中文向量: ${entry.Chinese}`);
+                                    const chineseResult = await embeddingService.storeEmbedding(
+                                        entry.Chinese,
+                                        {
+                                            Chinese: entry.Chinese,
+                                            English: entry.English || '',
+                                            type: 'chinese'
+                                        }
+                                    );
+                                    
+                                    if (!chineseResult.success) {
+                                        console.error(`更新中文向量失败: ${entry.Chinese}`);
+                                        continue;
+                                    }
+                                    
+                                    chineseVectorId = chineseResult.id;
+                                    console.log(`中文向量ID: ${chineseVectorId}`);
+                                }
+                                
+                                if (entry.English) {
+                                    console.log(`更新英文向量: ${entry.English}`);
+                                    const englishResult = await embeddingService.storeEmbedding(
+                                        entry.English,
+                                        {
+                                            Chinese: entry.Chinese,
+                                            English: entry.English,
+                                            type: 'english'
+                                        }
+                                    );
+                                    
+                                    if (!englishResult.success) {
+                                        console.error(`更新英文向量失败: ${entry.English}`);
+                                        continue;
+                                    }
+                                    
+                                    englishVectorId = englishResult.id;
+                                    console.log(`英文向量ID: ${englishVectorId}`);
+                                }
+                                
+                                // 添加向量ID到更新字段
+                                if (chineseVectorId || englishVectorId) {
+                                    fieldsToUpdate.push(`vector_id = ?`);
+                                    // 使用JSON存储两种向量ID
+                                    const vectorIds = {
+                                        chinese: chineseVectorId,
+                                        english: englishVectorId
+                                    };
+                                    updateValues.push(JSON.stringify(vectorIds));
                                 }
                             }
                             
-                            // 验证必填字段
-                            if (!entry.Chinese) {
-                                console.log('跳过没有中文的行');
-                                return null; // 跳过没有中文的行
-                            }
+                            // 更新MySQL数据库
+                            updateValues.push(entry.Chinese); // 添加WHERE条件的值
+                            await connection.execute(
+                                `UPDATE \`translate\` SET ${fieldsToUpdate.join(', ')} WHERE Chinese = ?`,
+                                updateValues
+                            );
                             
-                            try {
-                                // 存储向量嵌入
-                                console.log(`开始处理向量嵌入: ${entry.Chinese}`);
-                                await embeddingService.storeEmbedding(
-                                    entry.Chinese,
+                            console.log(`更新条目成功: ${entry.Chinese}`);
+                            updatedCount++;
+                        } else {
+                            console.log(`条目无需更新: ${entry.Chinese}`);
+                            skippedCount++;
+                        }
+                    } else {
+                        console.log(`新条目: ${entry.Chinese}，准备插入`);
+                        
+                        // 处理向量数据
+                        if (vectorServiceAvailable) {
+                            // 为中文和英文分别创建向量
+                            let chineseVectorId = null;
+                            let englishVectorId = null;
+                            
+                            if (entry.Chinese) {
+                                console.log(`创建中文向量: ${entry.Chinese}`);
+                                const chineseResult = await embeddingService.storeEmbedding(
                                     entry.Chinese,
                                     {
                                         Chinese: entry.Chinese,
-                                        English: entry.English || ''
+                                        English: entry.English || '',
+                                        type: 'chinese'
                                     }
                                 );
-                                console.log(`向量嵌入处理成功: ${entry.Chinese}`);
                                 
-                                // 插入数据库
-                                console.log(`开始插入数据库: ${entry.Chinese}`);
-                                await connection.execute(
-                                    'INSERT INTO `translate-cn` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese, vector_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                                    [
-                                        entry.Chinese || '',
-                                        entry.English || '',
-                                        entry.Japanese || '',
-                                        entry.Korean || '',
-                                        entry.Spanish || '',
-                                        entry.French || '',
-                                        entry.German || '',
-                                        entry.Russian || '',
-                                        entry.Thai || '',
-                                        entry.Italian || '',
-                                        entry.Indonesian || '',
-                                        entry.Portuguese || '',
-                                        entry.Chinese // 使用中文作为vector_id
-                                    ]
-                                );
-                                console.log(`数据库插入成功: ${entry.Chinese}`);
-                                importedCount++;
-                                return entry;
-                            } catch (error) {
-                                console.error(`处理条目失败 (${entry.Chinese}):`, error);
-                                return null; // 跳过错误的条目
+                                if (!chineseResult.success) {
+                                    console.error(`创建中文向量失败: ${entry.Chinese}`);
+                                    continue;
+                                }
+                                
+                                chineseVectorId = chineseResult.id;
+                                console.log(`中文向量ID: ${chineseVectorId}`);
                             }
-                        });
-                        
-                        // 等待批次完成
-                        console.log(`等待批次 ${batchIndex + 1} 完成处理`);
-                        const results = await Promise.all(promises.filter(p => p !== null));
-                        console.log(`批次 ${batchIndex + 1} 完成处理，成功处理 ${results.length} 条数据`);
-                    }
-                } catch (vectorError) {
-                    console.error('向量批量处理失败:', vectorError);
-                    // 回滚事务
-                    console.log('由于向量处理失败，开始回滚事务');
-                    await connection.rollback();
-                    connection.release();
-                    throw new Error(`向量处理失败: ${vectorError.message}`);
-                }
-            } else {
-                console.log('向量服务不可用，仅处理数据库插入');
-                // 如果向量服务不可用，只处理数据库插入
-                for (const row of rows) {
-                    const entry = {};
-                    
-                    // 映射字段
-                    for (const [excelField, dbField] of Object.entries(fieldMapping)) {
-                        if (row[excelField] !== undefined) {
-                            entry[dbField] = String(row[excelField]).trim();
+                            
+                            if (entry.English) {
+                                console.log(`创建英文向量: ${entry.English}`);
+                                const englishResult = await embeddingService.storeEmbedding(
+                                    entry.English,
+                                    {
+                                        Chinese: entry.Chinese,
+                                        English: entry.English,
+                                        type: 'english'
+                                    }
+                                );
+                                
+                                if (!englishResult.success) {
+                                    console.error(`创建英文向量失败: ${entry.English}`);
+                                    continue;
+                                }
+                                
+                                englishVectorId = englishResult.id;
+                                console.log(`英文向量ID: ${englishVectorId}`);
+                            }
+                            
+                            // 添加向量ID到插入字段
+                            if (chineseVectorId || englishVectorId) {
+                                // 使用JSON存储两种向量ID
+                                const vectorIds = {
+                                    chinese: chineseVectorId,
+                                    english: englishVectorId
+                                };
+                                entry.vector_id = JSON.stringify(vectorIds);
+                            }
                         }
-                    }
-                    
-                    // 验证必填字段
-                    if (!entry.Chinese) {
-                        console.log('跳过没有中文的行');
-                        continue; // 跳过没有中文的行
-                    }
-                    
-                    try {
-                        // 插入数据
-                        console.log(`开始插入数据库: ${entry.Chinese}`);
+                        
+                        // 插入MySQL数据库
                         await connection.execute(
-                            'INSERT INTO `translate-cn` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese, vector_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                            'INSERT INTO `translate` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese, vector_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                             [
                                 entry.Chinese || '',
                                 entry.English || '',
@@ -664,15 +870,17 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
                                 entry.Italian || '',
                                 entry.Indonesian || '',
                                 entry.Portuguese || '',
-                                entry.Chinese // 使用中文作为vector_id
+                                entry.vector_id
                             ]
                         );
-                        console.log(`数据库插入成功: ${entry.Chinese}`);
+                        
+                        console.log(`插入条目成功: ${entry.Chinese}`);
                         importedCount++;
-                    } catch (error) {
-                        console.error('插入数据时出错:', error);
-                        // 继续处理下一行
                     }
+                } catch (error) {
+                    console.error(`处理条目失败 (${entry.Chinese}):`, error);
+                    // 继续处理下一条，不中断整个导入过程
+                    skippedCount++;
                 }
             }
             
@@ -680,15 +888,28 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
             console.log('事务处理完成，开始提交');
             await connection.commit();
             console.log('事务提交成功');
-            connection.release();
-            res.json({ success: true, count: importedCount });
+            
+            // 返回结果
+            res.json({
+                success: true,
+                count: importedCount + updatedCount,
+                details: {
+                    imported: importedCount,
+                    updated: updatedCount,
+                    skipped: skippedCount
+                }
+            });
         } catch (error) {
             // 回滚事务
             console.log('事务处理失败，开始回滚');
             await connection.rollback();
             console.log('事务回滚成功');
+            
+            throw error; // 重新抛出错误以便外层捕获
+        } finally {
+            // 释放连接
             connection.release();
-            throw error;
+            console.log('数据库连接已释放');
         }
     } catch (error) {
         console.error('导入Excel时出错:', error);
@@ -700,7 +921,7 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
 app.get('/api/export', async (req, res) => {
     try {
         // 获取所有条目
-        const [rows] = await pool.execute('SELECT * FROM `translate-cn`');
+        const [rows] = await pool.execute('SELECT * FROM `translate`');
         
         // 创建工作簿
         const workbook = XLSX.utils.book_new();
@@ -775,12 +996,74 @@ app.get('/api/vector-search', async (req, res) => {
     }
 });
 
+// 增强的向量搜索API，支持按语言类型搜索
+app.get('/api/vector-search/advanced', async (req, res) => {
+    try {
+        const { text, type = 'chinese', limit = 5 } = req.query;
+        
+        if (!text) {
+            return res.status(400).json({ error: '请提供搜索文本' });
+        }
+        
+        if (!['chinese', 'english'].includes(type)) {
+            return res.status(400).json({ error: '类型参数无效，必须是 chinese 或 english' });
+        }
+        
+        if (!vectorServiceAvailable) {
+            return res.status(503).json({ 
+                error: '向量搜索服务不可用',
+                message: '请确保Qdrant服务已启动且配置正确'
+            });
+        }
+        
+        console.log(`执行高级向量搜索，文本: "${text}", 类型: ${type}, 限制: ${limit}`);
+        const results = await embeddingService.searchSimilar(text, type, parseInt(limit));
+        
+        // 从数据库获取完整的翻译条目
+        if (results.length > 0) {
+            const ids = results.map(result => {
+                // 从ID中提取Chinese部分（去掉语言后缀）
+                const idParts = result.id.split('_');
+                return idParts[0]; // 返回不带语言后缀的ID部分
+            });
+            
+            // 构建IN查询的占位符
+            const placeholders = ids.map(() => '?').join(',');
+            
+            // 查询数据库获取完整条目
+            const [entries] = await pool.execute(
+                `SELECT * FROM \`translate\` WHERE Chinese IN (${placeholders})`,
+                ids
+            );
+            
+            // 将数据库结果与向量搜索结果合并
+            const enrichedResults = results.map(result => {
+                const idParts = result.id.split('_');
+                const chinese = idParts[0];
+                const entry = entries.find(e => e.Chinese === chinese) || {};
+                
+                return {
+                    ...result,
+                    entry
+                };
+            });
+            
+            res.json(enrichedResults);
+        } else {
+            res.json([]);
+        }
+    } catch (error) {
+        console.error('高级向量搜索失败:', error);
+        res.status(500).json({ error: '高级向量搜索失败', message: error.message });
+    }
+});
+
 // 启动服务器
 (async () => {
     try {
         await initializeDatabase();
         app.listen(port, () => {
-            console.log(`服务器运行在 http://localhost:${port}`);
+            console.log(`服务器运行在 http://0.0.0.0:${port}`);
         });
     } catch (error) {
         console.error('服务器启动失败:', error);

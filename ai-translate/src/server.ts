@@ -65,7 +65,7 @@ app.get('/api/entries', async (req: Request, res: Response) => {
         
         if (!searchTerm) {
             // 如果没有搜索词，返回所有条目
-            const [rows] = await connection.query('SELECT * FROM `translate-cn`');
+            const [rows] = await connection.query('SELECT * FROM `translate`');
             entries = rows as TranslationEntry[];
         } else {
             // 使用向量搜索
@@ -74,7 +74,7 @@ app.get('/api/entries', async (req: Request, res: Response) => {
                 // 从结果中提取ID并查询数据库
                 const ids = results.map(result => result.id).join(',');
                 const [rows] = await connection.query(
-                    'SELECT * FROM `translate-cn` WHERE id IN (?)',
+                    'SELECT * FROM `translate` WHERE id IN (?)',
                     [ids]
                 );
                 entries = rows as TranslationEntry[];
@@ -149,7 +149,7 @@ app.post('/api/import', upload.single('file'), async (req: MulterRequest, res: R
             try {
                 // 插入数据
                 await connection.query(
-                    'INSERT INTO `translate-cn` SET ?',
+                    'INSERT INTO `translate` SET ?',
                     entry
                 );
                 importedCount++;

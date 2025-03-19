@@ -1,5 +1,6 @@
 const fetch = require('node-fetch');
 const { QdrantClient } = require('@qdrant/qdrant-js');
+const crypto = require('crypto'); // 导入crypto模块
 require('dotenv').config();  // 确保加载环境变量
 
 class OllamaEmbeddingService {
@@ -87,20 +88,23 @@ class OllamaEmbeddingService {
     /**
      * 存储嵌入向量到Qdrant
      */
-    async storeEmbedding(id, text, metadata) {
+    async storeEmbedding(text, metadata) {
         try {
             const embedding = await this.generateEmbedding(text);
             
             if (embedding === null) {
                 console.error('生成嵌入向量失败，无法存储');
-                return false;
+                return { success: false, id: null };
             }
+            
+            // 使用UUID作为ID
+            const uuid = crypto.randomUUID();
             
             await this.qdrantClient.upsert(this.collectionName, {
                 wait: true,
                 points: [
                     {
-                        id,
+                        id: uuid,
                         vector: embedding,
                         payload: {
                             text,
@@ -110,18 +114,22 @@ class OllamaEmbeddingService {
                 ]
             });
             
-            return true;
+            console.log(`成功存储嵌入向量: ${uuid}, 类型: ${metadata.type || '未指定'}`);
+            return { success: true, id: uuid };
         } catch (error) {
             console.error('存储嵌入向量失败:', error);
             // 不抛出错误，而是返回失败状态
-            return false;
+            return { success: false, id: null };
         }
     }
 
     /**
      * 搜索相似文本
+     * @param {string} text - 要搜索的文本
+     * @param {string} type - 搜索类型，可以是 'chinese' 或 'english'
+     * @param {number} limit - 返回结果数量限制
      */
-    async searchSimilar(text, limit = 5) {
+    async searchSimilar(text, type = 'chinese', limit = 5) {
         try {
             const embedding = await this.generateEmbedding(text);
             
@@ -130,12 +138,27 @@ class OllamaEmbeddingService {
                 return [];
             }
             
+            // 构建过滤条件，根据类型搜索
+            const filter = {
+                must: [
+                    {
+                        key: 'type',
+                        match: {
+                            value: type
+                        }
+                    }
+                ]
+            };
+            
+            console.log(`开始搜索相似文本，类型: ${type}, 限制: ${limit}`);
             const searchResults = await this.qdrantClient.search(this.collectionName, {
                 vector: embedding,
                 limit,
+                filter,
                 with_payload: true
             });
             
+            console.log(`搜索完成，找到 ${searchResults.length} 条结果`);
             return searchResults.map(result => ({
                 id: result.id,
                 score: result.score,

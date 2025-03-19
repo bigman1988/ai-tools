@@ -34,9 +34,9 @@ export class DatabaseService {
 
     async initializeDatabase(): Promise<void> {
         try {
-            // Create translate-cn table if it doesn't exist
+            // Create translate table if it doesn't exist
             await this.pool.execute(`
-                CREATE TABLE IF NOT EXISTS \`translate-cn\` (
+                CREATE TABLE IF NOT EXISTS \`translate\` (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     Chinese TEXT,
                     English TEXT,
@@ -65,7 +65,7 @@ export class DatabaseService {
     async addEntry(entry: TranslationEntry): Promise<number> {
         try {
             const [result] = await this.pool.execute(
-                'INSERT INTO `translate-cn` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese, vector_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                'INSERT INTO `translate` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese, vector_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 [
                     entry.Chinese,
                     entry.English,
@@ -95,7 +95,7 @@ export class DatabaseService {
         offset: number = 0
     ): Promise<TranslationEntry[]> {
         try {
-            let query = 'SELECT * FROM `translate-cn` WHERE 1=1';
+            let query = 'SELECT * FROM `translate` WHERE 1=1';
             const params: any[] = [];
 
             if (searchTerm) {
@@ -143,7 +143,7 @@ export class DatabaseService {
             values.push(id);
 
             const [result] = await this.pool.execute(
-                `UPDATE \`translate-cn\` SET ${fields.join(', ')} WHERE id = ?`,
+                `UPDATE \`translate\` SET ${fields.join(', ')} WHERE id = ?`,
                 values
             );
 
@@ -157,7 +157,7 @@ export class DatabaseService {
     async deleteEntry(id: number): Promise<boolean> {
         try {
             const [result] = await this.pool.execute(
-                'DELETE FROM `translate-cn` WHERE id = ?',
+                'DELETE FROM `translate` WHERE id = ?',
                 [id]
             );
             return (result as mysql.ResultSetHeader).affectedRows > 0;
@@ -191,7 +191,7 @@ export class DatabaseService {
             ]);
 
             const [result] = await this.pool.execute(
-                `INSERT INTO \`translate-cn\` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese, vector_id) VALUES ${placeholders}`,
+                `INSERT INTO \`translate\` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese, vector_id) VALUES ${placeholders}`,
                 values
             );
 
