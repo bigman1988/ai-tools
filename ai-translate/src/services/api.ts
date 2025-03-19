@@ -2,9 +2,32 @@ import { TranslationEntry } from '../types';
 
 export class ApiService {
     private baseUrl: string;
+    private debug: boolean = true; // 启用调试模式
 
     constructor() {
         this.baseUrl = 'http://localhost:3000/api';
+        console.log('ApiService: 初始化，baseUrl =', this.baseUrl);
+    }
+
+    /**
+     * 设置调试模式
+     */
+    public setDebug(debug: boolean): void {
+        this.debug = debug;
+        console.log('ApiService: 调试模式', debug ? '开启' : '关闭');
+    }
+
+    /**
+     * 调试日志
+     */
+    private logDebug(message: string, data?: any): void {
+        if (this.debug) {
+            if (data) {
+                console.log(`[API] ${message}`, data);
+            } else {
+                console.log(`[API] ${message}`);
+            }
+        }
     }
 
     async getStatus(): Promise<{ status: string; message: string }> {
@@ -115,25 +138,44 @@ export class ApiService {
         }
     }
 
-    async importExcel(file: File): Promise<{ success: boolean; count: number }> {
+    async importExcel(file: File): Promise<{ success: boolean; count: number; error?: string }> {
         try {
+            console.log('ApiService: 开始导入Excel文件', file.name, file.size);
+            
+            // 检查文件类型
+            if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+                console.error('ApiService: 文件格式不支持', file.name);
+                return { success: false, count: 0, error: '只支持.xlsx或.xls格式的Excel文件' };
+            }
+            
             const formData = new FormData();
             formData.append('file', file);
+            console.log('ApiService: FormData已创建并添加文件');
 
+            // 打印请求信息
+            console.log('ApiService: 请求URL:', `${this.baseUrl}/import`);
+            console.log('ApiService: 请求方法:', 'POST');
+            console.log('ApiService: 文件类型:', file.type);
+
+            console.log('ApiService: 开始发送请求到', `${this.baseUrl}/import`);
             const response = await fetch(`${this.baseUrl}/import`, {
                 method: 'POST',
                 body: formData,
             });
+            console.log('ApiService: 收到响应', response.status, response.statusText);
 
             if (!response.ok) {
-                throw new Error(`导入失败: ${response.status}`);
+                const errorText = await response.text();
+                console.error('ApiService: 导入失败', response.status, errorText);
+                return { success: false, count: 0, error: `导入失败: ${response.status} - ${errorText}` };
             }
 
             const result = await response.json();
+            console.log('ApiService: 导入成功', result);
             return { success: true, count: result.count || 0 };
         } catch (error) {
-            console.error('导入Excel失败:', error);
-            return { success: false, count: 0 };
+            console.error('ApiService: 导入Excel失败:', error);
+            return { success: false, count: 0, error: (error as Error).message };
         }
     }
 

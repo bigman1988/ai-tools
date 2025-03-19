@@ -1,0 +1,45 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "启动翻译工具服务器",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/ai-translate/src/server.js",
+      "outFiles": ["${workspaceFolder}/**/*.js"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "cwd": "${workspaceFolder}/ai-translate",
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    {
+      "type": "node",
+      "request": "attach",
+      "name": "附加到已运行的服务器",
+      "port": 9229,
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "调试Excel导入",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/ai-translate/src/server.js",
+      "outFiles": ["${workspaceFolder}/**/*.js"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "cwd": "${workspaceFolder}/ai-translate",
+      "env": {
+        "NODE_ENV": "development",
+        "DEBUG": "excel-import:*"
+      },
+      "args": [],
+      "sourceMaps": true,
+      "smartStep": true,
+      "breakOnFirstLine": false
+    }
+  ]
+}

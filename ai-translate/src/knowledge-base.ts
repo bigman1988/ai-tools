@@ -122,19 +122,14 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
         // 搜索按钮事件
         this.searchBtn.addEventListener('click', async () => {
             const searchTerm = this.searchInput.value.trim();
-            const entries = await this.searchEntries(searchTerm);
-            this.currentEntries = entries;
-            this.tableRenderer.renderTable(entries);
+            await this.loadEntries(searchTerm);
         });
 
         // 搜索输入框回车事件
         this.searchInput.addEventListener('keypress', (event) => {
             if (event.key === 'Enter') {
                 const searchTerm = this.searchInput.value.trim();
-                this.searchEntries(searchTerm).then((entries) => {
-                    this.currentEntries = entries;
-                    this.tableRenderer.renderTable(entries);
-                });
+                this.loadEntries(searchTerm).then();
             }
         });
 
@@ -191,21 +186,14 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
      */
     public async loadEntries(searchTerm?: string): Promise<void> {
         try {
-            // 如果没有搜索词且内存中没有数据，则从数据库加载
-            if (!searchTerm && this.currentEntries.length === 0) {
-                const entries = await this.apiService.getEntries();
-                this.currentEntries = entries;
-                this.tableRenderer.renderTable(entries);
-                this.log(`加载了 ${entries.length} 条记录`);
-                return;
-            }
+            // 始终从数据库重新加载数据，确保数据是最新的
+            const entries = await this.apiService.getEntries();
+            this.currentEntries = entries;
             
-            // 如果有搜索词或内存中已有数据，则在内存中搜索
-            let filteredEntries = this.currentEntries;
-            
+            // 如果有搜索词，则在新加载的数据中过滤
             if (searchTerm) {
                 const searchTermLower = searchTerm.toLowerCase();
-                filteredEntries = this.currentEntries.filter(entry => {
+                const filteredEntries = this.currentEntries.filter(entry => {
                     // 在所有字段中搜索
                     return Object.values(entry).some(value => {
                         if (typeof value === 'string') {
@@ -216,14 +204,15 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
                 });
                 
                 this.tableRenderer.renderTable(filteredEntries);
-                this.log(`搜索结果: ${filteredEntries.length} 条记录`);
+                this.log(`找到 ${filteredEntries.length} 条匹配记录`);
             } else {
-                // 如果没有搜索词，显示所有记录
-                this.tableRenderer.renderTable(this.currentEntries);
-                this.log(`显示全部 ${this.currentEntries.length} 条记录`);
+                // 没有搜索词，显示所有数据
+                this.tableRenderer.renderTable(entries);
+                this.log(`加载了 ${entries.length} 条记录`);
             }
         } catch (error) {
-            this.log(`加载失败: ${(error as Error).message}`, 'error');
+            console.error('加载条目时出错:', error);
+            this.log('加载条目失败', 'error');
         }
     }
 
@@ -400,26 +389,62 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
     public async importFile(file: File): Promise<void> {
         try {
             this.log('开始导入文件...');
+            console.log('开始导入文件:', file.name, '大小:', file.size, '类型:', file.type);
             
             // 检查文件类型
             if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
                 this.log('只支持.xlsx或.xls格式的Excel文件', 'error');
+                console.error('文件格式不支持:', file.name);
                 return;
             }
 
+            // 显示进度条
+            this.progressFill.style.width = '50%';
+            this.progressText.textContent = '导入中...';
+            this.progressDetails.textContent = `正在导入 ${file.name}`;
+
             // 开始导入
+            console.log('调用API导入文件');
             const result = await this.apiService.importExcel(file);
+            console.log('导入结果:', result);
             
             if (result.success) {
                 this.log(`成功导入 ${result.count} 条记录`, 'info');
+                console.log(`成功导入 ${result.count} 条记录`);
+                
+                // 更新进度条
+                this.progressFill.style.width = '100%';
+                this.progressText.textContent = '导入完成';
+                this.progressDetails.textContent = `成功导入 ${result.count} 条记录`;
+                
                 // 刷新数据
+                console.log('开始刷新数据表');
                 await this.loadEntries();
+                console.log('数据表刷新完成');
             } else {
-                this.log('导入失败', 'error');
+                const errorMessage = result.error || '导入失败';
+                this.log(errorMessage, 'error');
+                console.error('导入失败:', errorMessage);
+                
+                // 更新进度条
+                this.progressFill.style.width = '0%';
+                this.progressText.textContent = '导入失败';
+                this.progressDetails.textContent = errorMessage;
+                
+                // 显示详细错误信息
+                alert(`导入失败: ${errorMessage}`);
             }
         } catch (error) {
             console.error('导入文件时出错:', error);
-            this.log('导入文件失败', 'error');
+            this.log(`导入文件失败: ${(error as Error).message}`, 'error');
+            
+            // 更新进度条
+            this.progressFill.style.width = '0%';
+            this.progressText.textContent = '导入失败';
+            this.progressDetails.textContent = (error as Error).message;
+            
+            // 显示详细错误信息
+            alert(`导入文件失败: ${(error as Error).message}`);
         }
     }
 
@@ -438,7 +463,17 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
      * 记录日志
      */
     public log(message: string, type: 'info' | 'warning' | 'error' = 'info'): void {
+        // 使用日志函数记录日志
         this.logFunction(message, type);
+        
+        // 同时在控制台记录
+        if (type === 'info') {
+            console.log(`[知识库] ${message}`);
+        } else if (type === 'warning') {
+            console.warn(`[知识库] ${message}`);
+        } else if (type === 'error') {
+            console.error(`[知识库] ${message}`);
+        }
     }
 }
 
