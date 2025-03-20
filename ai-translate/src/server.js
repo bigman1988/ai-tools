@@ -80,7 +80,7 @@ async function startServer() {
     try {
         // 初始化数据库
         await initializeDatabase();
-        console.log('数据库初始化成功');
+        //console.log('数据库初始化成功');
         
         // 初始化向量存储
         await initializeVectorStorage();
