@@ -1,12 +1,13 @@
-const express = require('express');
+import express from 'express';
+import { embeddingService } from '../services/embedding.js';
+
 const router = express.Router();
-const { embeddingService } = require('../services/embedding');
 
 // 全局变量，表示向量服务是否可用
 let vectorServiceAvailable = false;
 
 // 设置向量服务状态
-function setVectorServiceStatus(status) {
+export function setVectorServiceStatus(status) {
     vectorServiceAvailable = status;
 }
 
@@ -68,7 +69,4 @@ router.get('/advanced', async (req, res) => {
     }
 });
 
-module.exports = {
-    router,
-    setVectorServiceStatus
-};
+export { router };

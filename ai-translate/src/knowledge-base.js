@@ -1,43 +1,18 @@
 import './styles.css';
-import { ApiService } from './services/api';
-import { TranslationEntry } from './services/database';
-import { IKnowledgeBaseManager } from './types/kb-types';
-import { KnowledgeBaseModals } from './components/kb-modals';
-import { KnowledgeBaseTableRenderer } from './components/kb-table-renderer';
+import { ApiService } from './services/api.js';
+import { KnowledgeBaseModals } from './components/kb-modals.js';
+import { KnowledgeBaseTableRenderer } from './components/kb-table-renderer.js';
 import * as XLSX from 'xlsx';
-import { createLogger } from './utils/kb-utils';
+import { createLogger } from './utils/kb-utils.js';
 
 // 添加全局实例变量，用于检查是否已经初始化
-declare global {
-    interface Window {
-        knowledgeBaseManagerInstance?: KnowledgeBaseManager;
-    }
-}
+// 注意：在JavaScript中，我们不需要声明global接口，直接使用window对象
 
-export class KnowledgeBaseManager implements IKnowledgeBaseManager {
-    private currentEntries: TranslationEntry[] = [];
-    private tableRenderer: KnowledgeBaseTableRenderer;
-    private apiService: ApiService;
-    
-    // DOM元素
-    private fileInput!: HTMLInputElement;
-    private fileName!: HTMLDivElement;
-    private uploadBtn!: HTMLButtonElement;
-    private actionButtons!: HTMLDivElement;
-    private logOutput!: HTMLDivElement;
-    private progressFill!: HTMLDivElement;
-    private progressText!: HTMLDivElement;
-    private progressDetails!: HTMLDivElement;
-    private searchInput!: HTMLInputElement;
-    private searchBtn!: HTMLButtonElement;
-    private kbTableOutput!: HTMLDivElement;
-    private deleteSelectedBtn!: HTMLButtonElement;
-    private addEntryBtn!: HTMLButtonElement;
-    
-    // 日志记录函数
-    private logFunction: (message: string, type: 'info' | 'warning' | 'error') => void;
-
+export class KnowledgeBaseManager {
     constructor() {
+        // 初始化属性
+        this.currentEntries = [];
+        
         // 初始化所有DOM元素
         this.initializeDOMElements();
         
@@ -65,19 +40,19 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
     /**
      * 初始化DOM元素
      */
-    private initializeDOMElements(): void {
-        this.fileInput = document.getElementById('fileInput') as HTMLInputElement;
-        this.fileName = document.getElementById('fileName') as HTMLDivElement;
-        this.uploadBtn = document.getElementById('uploadBtn') as HTMLButtonElement;
-        this.actionButtons = document.getElementById('actionButtons') as HTMLDivElement;
-        this.logOutput = document.getElementById('logOutput') as HTMLDivElement;
-        this.progressFill = document.getElementById('progressFill') as HTMLDivElement;
-        this.progressText = document.getElementById('progressText') as HTMLDivElement;
-        this.progressDetails = document.getElementById('progressDetails') as HTMLDivElement;
-        this.searchInput = document.getElementById('searchInput') as HTMLInputElement;
-        this.searchBtn = document.getElementById('searchBtn') as HTMLButtonElement;
-        this.kbTableOutput = document.getElementById('kbTableOutput') as HTMLDivElement;
-        this.deleteSelectedBtn = document.getElementById('deleteSelectedBtn') as HTMLButtonElement;
+    initializeDOMElements() {
+        this.fileInput = document.getElementById('fileInput');
+        this.fileName = document.getElementById('fileName');
+        this.uploadBtn = document.getElementById('uploadBtn');
+        this.actionButtons = document.getElementById('actionButtons');
+        this.logOutput = document.getElementById('logOutput');
+        this.progressFill = document.getElementById('progressFill');
+        this.progressText = document.getElementById('progressText');
+        this.progressDetails = document.getElementById('progressDetails');
+        this.searchInput = document.getElementById('searchInput');
+        this.searchBtn = document.getElementById('searchBtn');
+        this.kbTableOutput = document.getElementById('kbTableOutput');
+        this.deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
         
         // 检查必要的DOM元素是否存在
         if (!this.fileInput || !this.uploadBtn || !this.kbTableOutput) {
@@ -88,22 +63,22 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
     /**
      * 初始化数据库连接
      */
-    private async initializeDatabase(): Promise<void> {
+    async initializeDatabase() {
         try {
             await this.loadEntries();
             this.log('数据库连接成功');
         } catch (error) {
-            this.log(`数据库连接失败: ${(error as Error).message}`, 'error');
+            this.log(`数据库连接失败: ${error.message}`, 'error');
         }
     }
 
     /**
      * 初始化事件监听器
      */
-    private initializeEventListeners(): void {
+    initializeEventListeners() {
         // 文件选择事件
         this.fileInput.addEventListener('change', (event) => {
-            const files = (event.target as HTMLInputElement).files;
+            const files = event.target.files;
             if (files && files.length > 0) {
                 const file = files[0];
                 this.fileName.textContent = file.name;
@@ -167,7 +142,7 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
                         }
                     } catch (error) {
                         failCount++;
-                        this.log(`删除失败 "${id}": ${(error as Error).message}`, 'error');
+                        this.log(`删除失败 "${id}": ${error.message}`, 'error');
                     }
                 }
                 
@@ -176,15 +151,17 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
                 // 刷新数据
                 await this.loadEntries();
             } catch (error) {
-                this.log(`批量删除失败: ${(error as Error).message}`, 'error');
+                this.log(`批量删除失败: ${error.message}`, 'error');
             }
         });
     }
 
     /**
      * 加载翻译条目
+     * @param {string} [searchTerm] - 可选的搜索词
+     * @returns {Promise<void>}
      */
-    public async loadEntries(searchTerm?: string): Promise<void> {
+    async loadEntries(searchTerm) {
         try {
             // 始终从数据库重新加载数据，确保数据是最新的
             const entries = await this.apiService.getEntries();
@@ -218,8 +195,10 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
 
     /**
      * 搜索条目
+     * @param {string} searchTerm - 搜索词
+     * @returns {Promise<Array>} - 返回匹配的翻译条目
      */
-    public async searchEntries(searchTerm: string): Promise<TranslationEntry[]> {
+    async searchEntries(searchTerm) {
         try {
             // 如果搜索词为空，获取所有条目
             if (!searchTerm.trim()) {
@@ -245,8 +224,10 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
 
     /**
      * 删除条目
+     * @param {string} chinese - 中文文本（作为主键）
+     * @returns {Promise<void>}
      */
-    public async deleteEntry(chinese: string): Promise<void> {
+    async deleteEntry(chinese) {
         const confirmDelete = confirm('确定要删除这条记录吗？');
         if (!confirmDelete) return;
         
@@ -260,19 +241,20 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
                 this.log('删除失败', 'error');
             }
         } catch (error) {
-            this.log(`删除失败: ${(error as Error).message}`, 'error');
+            this.log(`删除失败: ${error.message}`, 'error');
         }
     }
 
     /**
      * 处理Excel文件
+     * @param {File} file - Excel文件
      */
-    private processExcelFile(file: File): void {
+    processExcelFile(file) {
         const reader = new FileReader();
         
         reader.onload = (e) => {
             try {
-                const data = new Uint8Array(e.target?.result as ArrayBuffer);
+                const data = new Uint8Array(e.target?.result);
                 const workbook = XLSX.read(data, { type: 'array' });
                 
                 // 获取第一个工作表
@@ -283,9 +265,9 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
                 const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
                 
                 // 处理数据
-                this.processExcelData(jsonData as any[][]);
+                this.processExcelData(jsonData);
             } catch (error) {
-                this.log(`Excel文件处理失败: ${(error as Error).message}`, 'error');
+                this.log(`Excel文件处理失败: ${error.message}`, 'error');
             }
         };
         
@@ -298,8 +280,9 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
 
     /**
      * 处理Excel数据
+     * @param {Array<Array>} data - Excel数据
      */
-    private processExcelData(data: any[][]): void {
+    processExcelData(data) {
         try {
             // 检查数据是否有效
             if (!data || data.length < 7) {
@@ -311,7 +294,7 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
             const headers = data[1];
             
             // 定义表头映射
-            const headerMap: { [key: string]: string } = {
+            const headerMap = {
                 '简体中文': 'Chinese',
                 '英语': 'English',
                 '日语': 'Japanese',
@@ -327,8 +310,8 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
             };
             
             // 解析表头索引
-            const headerIndices: { [key: string]: number } = {};
-            headers.forEach((header: string, index: number) => {
+            const headerIndices = {};
+            headers.forEach((header, index) => {
                 const mappedHeader = headerMap[header];
                 if (mappedHeader) {
                     headerIndices[mappedHeader] = index;
@@ -342,7 +325,7 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
             }
             
             // 处理数据（从第7行开始，索引为6）
-            const entries: TranslationEntry[] = [];
+            const entries = [];
             
             for (let i = 6; i < data.length; i++) {
                 const row = data[i];
@@ -351,12 +334,12 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
                 if (!row || row.length === 0) continue;
                 
                 // 创建条目对象
-                const entry: Partial<TranslationEntry> = {};
+                const entry = {};
                 
                 // 填充条目数据
                 Object.entries(headerIndices).forEach(([field, index]) => {
                     if (index < row.length) {
-                        (entry as any)[field] = row[index] || '';
+                        entry[field] = row[index] || '';
                     }
                 });
                 
@@ -367,7 +350,7 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
                         this.log(`警告: 忽略过长的主键 "${entry.Chinese.substring(0, 30)}..." (${entry.Chinese.length} 字符)`, 'warning');
                         continue;
                     }
-                    entries.push(entry as TranslationEntry);
+                    entries.push(entry);
                 }
             }
             
@@ -379,14 +362,16 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
             
             this.log(`成功解析 ${entries.length} 条记录`);
         } catch (error) {
-            this.log(`数据处理失败: ${(error as Error).message}`, 'error');
+            this.log(`数据处理失败: ${error.message}`, 'error');
         }
     }
 
     /**
      * 导入文件
+     * @param {File} file - 要导入的文件
+     * @returns {Promise<void>}
      */
-    public async importFile(file: File): Promise<void> {
+    async importFile(file) {
         try {
             this.log('开始导入文件...');
             console.log('开始导入文件:', file.name, '大小:', file.size, '类型:', file.type);
@@ -436,22 +421,22 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
             }
         } catch (error) {
             console.error('导入文件时出错:', error);
-            this.log(`导入文件失败: ${(error as Error).message}`, 'error');
+            this.log(`导入文件失败: ${error.message}`, 'error');
             
             // 更新进度条
             this.progressFill.style.width = '0%';
             this.progressText.textContent = '导入失败';
-            this.progressDetails.textContent = (error as Error).message;
+            this.progressDetails.textContent = error.message;
             
             // 显示详细错误信息
-            alert(`导入文件失败: ${(error as Error).message}`);
+            alert(`导入文件失败: ${error.message}`);
         }
     }
 
     /**
      * 初始化
      */
-    public initialize(): void {
+    initialize() {
         // 初始化事件监听器
         this.initializeEventListeners();
         
@@ -461,8 +446,10 @@ export class KnowledgeBaseManager implements IKnowledgeBaseManager {
 
     /**
      * 记录日志
+     * @param {string} message - 日志消息
+     * @param {'info' | 'warning' | 'error'} [type='info'] - 日志类型
      */
-    public log(message: string, type: 'info' | 'warning' | 'error' = 'info'): void {
+    log(message, type = 'info') {
         // 使用日志函数记录日志
         this.logFunction(message, type);
         

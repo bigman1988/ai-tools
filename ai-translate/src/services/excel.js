@@ -1,8 +1,11 @@
-const XLSX = require('xlsx');
-const { excel } = require('../config/app');
-const dbService = require('./database');
-const { pool } = require('../config/database');
-const { embeddingService } = require('./embedding');
+import XLSX from 'xlsx';
+import appConfig from '../config/app.js';
+import { databaseService as dbService } from './database.js';
+import { pool } from '../config/database.js';
+import { embeddingService } from './embedding.js';
+
+// 从配置中获取 excel 配置
+const excel = appConfig.excel;
 
 class ExcelService {
     /**
@@ -331,4 +334,8 @@ class ExcelService {
     }
 }
 
-module.exports = new ExcelService();
+const excelService = new ExcelService();
+const importExcel = excelService.importExcel.bind(excelService);
+const exportExcel = excelService.exportExcel.bind(excelService);
+
+export { excelService, importExcel, exportExcel };

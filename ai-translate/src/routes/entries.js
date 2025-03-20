@@ -1,12 +1,13 @@
-const express = require('express');
+import express from 'express';
+import { knowledgeBaseService } from '../services/knowledge-base.js';
+
 const router = express.Router();
-const knowledgeBaseService = require('../services/knowledge-base');
 
 // 全局变量，表示向量服务是否可用
 let vectorServiceAvailable = false;
 
 // 设置向量服务状态
-function setVectorServiceStatus(status) {
+export function setVectorServiceStatus(status) {
     vectorServiceAvailable = status;
     knowledgeBaseService.setVectorServiceStatus(status);
 }
@@ -162,7 +163,4 @@ router.delete('/:Chinese', async (req, res) => {
     }
 });
 
-module.exports = {
-    router,
-    setVectorServiceStatus
-};
+export { router };

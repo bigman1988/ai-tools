@@ -1,26 +1,17 @@
 import { QdrantClient } from '@qdrant/js-client-rest';
 import fetch from 'node-fetch';
 
-export interface VectorEntry {
-    id: string;  
-    vector: number[];
-    payload?: Record<string, any>;
-}
-
 export class VectorStoreService {
-    private client: QdrantClient;
-    private collectionName: string = 'translation_kb';
-    private vectorSize: number = 768; 
-    private ollamaUrl: string;
-
     constructor() {
+        this.collectionName = 'translation_kb';
+        this.vectorSize = 768; 
         this.client = new QdrantClient({
             url: process.env.QDRANT_URL || 'http://localhost:6333',
         });
         this.ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
     }
 
-    async initializeCollection(): Promise<void> {
+    async initializeCollection() {
         try {
             const collections = await this.client.getCollections();
             const exists = collections.collections.some(c => c.name === this.collectionName);
@@ -42,7 +33,14 @@ export class VectorStoreService {
         }
     }
 
-    async addVector(entry: VectorEntry): Promise<void> {
+    /**
+     * 添加向量到存储
+     * @param {Object} entry - 向量条目
+     * @param {string} entry.id - 条目ID
+     * @param {Array<number>} entry.vector - 向量数据
+     * @param {Object} [entry.payload] - 附加数据
+     */
+    async addVector(entry) {
         try {
             await this.client.upsert(this.collectionName, {
                 points: [
@@ -59,7 +57,11 @@ export class VectorStoreService {
         }
     }
 
-    async bulkAddVectors(entries: VectorEntry[]): Promise<void> {
+    /**
+     * 批量添加向量
+     * @param {Array<Object>} entries - 向量条目数组
+     */
+    async bulkAddVectors(entries) {
         try {
             if (entries.length === 0) return;
 
@@ -76,7 +78,13 @@ export class VectorStoreService {
         }
     }
 
-    async searchSimilar(vector: number[], limit: number = 10): Promise<any[]> {
+    /**
+     * 搜索相似向量
+     * @param {Array<number>} vector - 查询向量
+     * @param {number} [limit=10] - 返回结果数量限制
+     * @returns {Promise<Array<Object>>} - 搜索结果
+     */
+    async searchSimilar(vector, limit = 10) {
         try {
             const result = await this.client.search(this.collectionName, {
                 vector: vector,
@@ -95,7 +103,11 @@ export class VectorStoreService {
         }
     }
 
-    async deleteVector(id: string): Promise<void> {
+    /**
+     * 删除向量
+     * @param {string} id - 要删除的向量ID
+     */
+    async deleteVector(id) {
         try {
             await this.client.delete(this.collectionName, {
                 points: [id],
@@ -106,7 +118,12 @@ export class VectorStoreService {
         }
     }
 
-    async getEmbeddingFromText(text: string): Promise<number[]> {
+    /**
+     * 从文本生成嵌入向量
+     * @param {string} text - 输入文本
+     * @returns {Promise<Array<number>>} - 嵌入向量
+     */
+    async getEmbeddingFromText(text) {
         try {
             const response = await fetch(`${this.ollamaUrl}/api/embeddings`, {
                 method: 'POST',
@@ -131,7 +148,13 @@ export class VectorStoreService {
         }
     }
 
-    async searchSimilarByText(text: string, limit: number = 10): Promise<any[]> {
+    /**
+     * 通过文本搜索相似条目
+     * @param {string} text - 查询文本
+     * @param {number} [limit=10] - 返回结果数量限制
+     * @returns {Promise<Array<Object>>} - 搜索结果
+     */
+    async searchSimilarByText(text, limit = 10) {
         try {
             const vector = await this.getEmbeddingFromText(text);
             return await this.searchSimilar(vector, limit);

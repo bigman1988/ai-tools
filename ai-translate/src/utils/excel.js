@@ -1,7 +1,11 @@
 import * as XLSX from 'xlsx';
-import { SheetData } from '../types/types';
 
-export function readExcelFile(file: File): Promise<{ [key: string]: SheetData }> {
+/**
+ * 读取Excel文件并解析内容
+ * @param {File} file - Excel文件
+ * @returns {Promise<Object>} - 解析后的数据，按工作表名称组织
+ */
+export function readExcelFile(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         
@@ -9,11 +13,11 @@ export function readExcelFile(file: File): Promise<{ [key: string]: SheetData }>
             try {
                 const data = e.target?.result;
                 const workbook = XLSX.read(data, { type: 'binary' });
-                const result: { [key: string]: SheetData } = {};
+                const result = {};
 
                 workbook.SheetNames.forEach(sheetName => {
                     const worksheet = workbook.Sheets[sheetName];
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
                     
                     // 分离表头行和数据行
                     const headerRows = jsonData.slice(0, 2);
@@ -39,7 +43,12 @@ export function readExcelFile(file: File): Promise<{ [key: string]: SheetData }>
     });
 }
 
-export function createExcelWorkbook(data: { [key: string]: SheetData }): XLSX.WorkBook {
+/**
+ * 创建Excel工作簿
+ * @param {Object} data - 数据对象，按工作表名称组织
+ * @returns {XLSX.WorkBook} - 创建的工作簿
+ */
+export function createExcelWorkbook(data) {
     const workbook = XLSX.utils.book_new();
 
     Object.entries(data).forEach(([sheetName, sheetData]) => {
@@ -51,7 +60,12 @@ export function createExcelWorkbook(data: { [key: string]: SheetData }): XLSX.Wo
     return workbook;
 }
 
-export function getExcelColumnName(index: number): string {
+/**
+ * 获取Excel列名
+ * @param {number} index - 列索引
+ * @returns {string} - 列名（如A, B, AA等）
+ */
+export function getExcelColumnName(index) {
     let columnName = '';
     while (index >= 0) {
         columnName = String.fromCharCode(65 + (index % 26)) + columnName;

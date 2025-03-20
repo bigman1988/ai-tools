@@ -1,11 +1,14 @@
-import { TranslationEntry } from '../services/database';
-
 /**
  * 知识库管理器工具函数
  */
 
 // HTML转义函数
-export function escapeHtml(text: string): string {
+/**
+ * 转义HTML特殊字符
+ * @param {string} text - 要转义的文本
+ * @returns {string} 转义后的文本
+ */
+export function escapeHtml(text) {
     if (!text) return '';
     return text
         .replace(/&/g, "&amp;")
@@ -16,12 +19,7 @@ export function escapeHtml(text: string): string {
 }
 
 // 定义语言字段映射，避免重复代码
-export interface LanguageField {
-    key: keyof TranslationEntry;
-    label: string;
-}
-
-export const languageFields: LanguageField[] = [
+export const languageFields = [
     { key: 'Chinese', label: '中文' },
     { key: 'English', label: '英文' },
     { key: 'Japanese', label: '日文' },
@@ -37,8 +35,13 @@ export const languageFields: LanguageField[] = [
 ];
 
 // 日志记录函数
-export function createLogger(logOutput: HTMLElement) {
-    return function log(message: string, type: 'info' | 'warning' | 'error' = 'info'): void {
+/**
+ * 创建日志记录函数
+ * @param {HTMLElement} logOutput - 日志输出的DOM元素
+ * @returns {Function} 日志记录函数
+ */
+export function createLogger(logOutput) {
+    return function log(message, type = 'info') {
         if (!logOutput) return;
 
         const logEntry = document.createElement('div');

@@ -1,6 +1,6 @@
-const { pool } = require('../config/database');
+import { pool } from '../config/database.js';
 
-class DatabaseService {
+export class DatabaseService {
     constructor() {
         this.pool = pool;
         console.log('数据库服务已初始化');
@@ -301,4 +301,4 @@ class DatabaseService {
     }
 }
 
-module.exports = new DatabaseService();
+export const databaseService = new DatabaseService();

@@ -1,9 +1,9 @@
-const dotenv = require('dotenv');
+import dotenv from 'dotenv';
 
 // 加载环境变量
 dotenv.config();
 
-module.exports = {
+export default {
     port: process.env.PORT || 3000,
     cors: {
         origin: '*',

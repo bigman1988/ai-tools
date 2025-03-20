@@ -1,11 +1,16 @@
-const express = require('express');
-const cors = require('cors');
-const bodyParser = require('body-parser');
-const path = require('path');
-const dotenv = require('dotenv');
-const { initializeDatabase } = require('./config/database');
-const { router: apiRouter, setVectorServiceStatus } = require('./routes/index');
-const { embeddingService } = require('./services/embedding');
+import express from 'express';
+import cors from 'cors';
+import bodyParser from 'body-parser';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+import { initializeDatabase } from './config/database.js';
+import { router as apiRouter, setVectorServiceStatus } from './routes/index.js';
+import { embeddingService } from './services/embedding.js';
+
+// 获取当前文件的目录路径
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // 加载环境变量
 dotenv.config();

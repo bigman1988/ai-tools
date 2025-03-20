@@ -5,17 +5,12 @@ const webpack = require('webpack');
 
 module.exports = {
     entry: {
-        main: './src/index.ts',
-        knowledgeBase: './src/knowledge-base.ts'
+        main: './src/index.js',
+        knowledgeBase: './src/knowledge-base.js'
     },
     mode: 'production',
     module: {
         rules: [
-            {
-                test: /\.tsx?$/,
-                use: 'ts-loader',
-                exclude: /node_modules/
-            },
             {
                 test: /\.css$/,
                 use: ['style-loader', 'css-loader']
@@ -23,7 +18,7 @@ module.exports = {
         ]
     },
     resolve: {
-        extensions: ['.tsx', '.ts', '.js'],
+        extensions: ['.js'],
         fallback: {
             "buffer": require.resolve("buffer/"),
             "crypto": require.resolve("crypto-browserify"),

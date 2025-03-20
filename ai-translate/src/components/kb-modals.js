@@ -1,24 +1,23 @@
-import { TranslationEntry } from '../services/database';
-import { ApiService } from '../services/api';
-import { languageFields } from '../utils/kb-utils';
-import { IKnowledgeBaseManager } from '../types/kb-types';
+import { ApiService } from '../services/api.js';
+import { languageFields } from '../utils/kb-utils.js';
 
 /**
  * 知识库模态框管理类
  */
 export class KnowledgeBaseModals {
-    private manager: IKnowledgeBaseManager;
-    private apiService: ApiService;
-
-    constructor(manager: IKnowledgeBaseManager) {
+    /**
+     * @param {Object} manager - 知识库管理器实例
+     */
+    constructor(manager) {
         this.manager = manager;
         this.apiService = new ApiService();
     }
 
     /**
      * 显示条目详情模态框
+     * @param {Object} entry - 翻译条目
      */
-    public showEntryDetails(entry: TranslationEntry): void {
+    showEntryDetails(entry) {
         const modal = document.createElement('div');
         modal.className = 'modal';
         
@@ -58,8 +57,9 @@ export class KnowledgeBaseModals {
 
     /**
      * 显示编辑条目模态框
+     * @param {Object} entry - 翻译条目
      */
-    public showEditEntryForm(entry: TranslationEntry): void {
+    showEditEntryForm(entry) {
         const modal = document.createElement('div');
         modal.className = 'modal';
         
@@ -111,16 +111,16 @@ export class KnowledgeBaseModals {
         }
         
         // 添加表单提交事件
-        const form = modal.querySelector('#editEntryForm') as HTMLFormElement;
+        const form = modal.querySelector('#editEntryForm');
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const entryChinese = (document.getElementById('entryChinese') as HTMLInputElement).value;
-            const updatedEntry: Partial<TranslationEntry> = {};
+            const entryChinese = document.getElementById('entryChinese').value;
+            const updatedEntry = {};
             
             // 收集表单数据
             languageFields.forEach(field => {
-                const input = document.getElementById(field.key) as HTMLTextAreaElement;
+                const input = document.getElementById(field.key);
                 if (input && input.value) {
                     updatedEntry[field.key] = input.value;
                 }
@@ -135,7 +135,7 @@ export class KnowledgeBaseModals {
                 // 刷新数据
                 await this.manager.loadEntries();
             } catch (error) {
-                this.manager.log(`更新失败: ${(error as Error).message}`, 'error');
+                this.manager.log(`更新失败: ${error.message}`, 'error');
             }
         });
     }
@@ -143,7 +143,7 @@ export class KnowledgeBaseModals {
     /**
      * 显示添加条目模态框
      */
-    public showAddEntryForm(): void {
+    showAddEntryForm() {
         const modal = document.createElement('div');
         modal.className = 'modal';
         
@@ -193,15 +193,15 @@ export class KnowledgeBaseModals {
         }
         
         // 添加表单提交事件
-        const form = modal.querySelector('#addEntryForm') as HTMLFormElement;
+        const form = modal.querySelector('#addEntryForm');
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const newEntry: Partial<TranslationEntry> = {};
+            const newEntry = {};
             
             // 收集表单数据
             languageFields.forEach(field => {
-                const input = document.getElementById(field.key) as HTMLTextAreaElement;
+                const input = document.getElementById(field.key);
                 if (input && input.value) {
                     newEntry[field.key] = input.value;
                 }
@@ -215,14 +215,14 @@ export class KnowledgeBaseModals {
             
             try {
                 // 使用API服务添加条目
-                await this.apiService.addEntry(newEntry as TranslationEntry);
+                await this.apiService.addEntry(newEntry);
                 this.manager.log('条目添加成功', 'info');
                 document.body.removeChild(modal);
                 
                 // 刷新数据
                 await this.manager.loadEntries();
             } catch (error) {
-                this.manager.log(`添加失败: ${(error as Error).message}`, 'error');
+                this.manager.log(`添加失败: ${error.message}`, 'error');
             }
         });
     }

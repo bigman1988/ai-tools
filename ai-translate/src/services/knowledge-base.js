@@ -1,7 +1,7 @@
-const dbService = require('./database');
-const { embeddingService } = require('./embedding');
+import { databaseService as dbService } from './database.js';
+import { embeddingService } from './embedding.js';
 
-class KnowledgeBaseService {
+export class KnowledgeBaseService {
     /**
      * 初始化知识库服务
      */
@@ -250,4 +250,4 @@ class KnowledgeBaseService {
     }
 }
 
-module.exports = new KnowledgeBaseService();
+export const knowledgeBaseService = new KnowledgeBaseService();

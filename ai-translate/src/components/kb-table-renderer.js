@@ -1,33 +1,28 @@
-import { TranslationEntry } from '../services/database';
-import { escapeHtml } from '../utils/kb-utils';
-import { KnowledgeBaseModals } from './kb-modals';
-import { IKnowledgeBaseManager } from '../types/kb-types';
+import { escapeHtml } from '../utils/kb-utils.js';
+import { KnowledgeBaseModals } from './kb-modals.js';
 
 /**
  * 知识库表格渲染类
  */
 export class KnowledgeBaseTableRenderer {
-    private container: HTMLElement;
-    private currentEntries: TranslationEntry[] = [];
-    private modals: KnowledgeBaseModals;
-    private manager: IKnowledgeBaseManager;
-    private deleteEntryCallback: (chinese: string) => Promise<void>;
-
-    constructor(
-        container: HTMLElement, 
-        manager: IKnowledgeBaseManager,
-        deleteEntryCallback: (chinese: string) => Promise<void>
-    ) {
+    /**
+     * @param {HTMLElement} container - 表格容器元素
+     * @param {Object} manager - 知识库管理器实例
+     * @param {Function} deleteEntryCallback - 删除条目的回调函数
+     */
+    constructor(container, manager, deleteEntryCallback) {
         this.container = container;
         this.manager = manager;
         this.modals = new KnowledgeBaseModals(manager);
         this.deleteEntryCallback = deleteEntryCallback;
+        this.currentEntries = [];
     }
 
     /**
      * 渲染翻译条目表格
+     * @param {Array} entries - 翻译条目数组
      */
-    public renderTable(entries: TranslationEntry[]): void {
+    renderTable(entries) {
         this.currentEntries = entries;
         
         if (!this.container) return;
@@ -88,12 +83,12 @@ export class KnowledgeBaseTableRenderer {
     /**
      * 初始化表格事件
      */
-    private initializeTableEvents(): void {
+    initializeTableEvents() {
         // 添加全选功能
-        const selectAllCheckbox = document.getElementById('selectAll') as HTMLInputElement;
+        const selectAllCheckbox = document.getElementById('selectAll');
         if (selectAllCheckbox) {
             selectAllCheckbox.addEventListener('change', () => {
-                const checkboxes = document.querySelectorAll('.entry-checkbox') as NodeListOf<HTMLInputElement>;
+                const checkboxes = document.querySelectorAll('.entry-checkbox');
                 checkboxes.forEach(checkbox => {
                     checkbox.checked = selectAllCheckbox.checked;
                 });
@@ -104,7 +99,7 @@ export class KnowledgeBaseTableRenderer {
         const tableRows = document.querySelectorAll('#entriesTableBody tr');
         tableRows.forEach(row => {
             row.addEventListener('dblclick', () => {
-                const checkbox = row.querySelector('.entry-checkbox') as HTMLInputElement;
+                const checkbox = row.querySelector('.entry-checkbox');
                 if (checkbox) {
                     const chinese = checkbox.getAttribute('data-id') || '';
                     const entry = this.currentEntries.find(e => e.Chinese === chinese);
@@ -118,10 +113,11 @@ export class KnowledgeBaseTableRenderer {
 
     /**
      * 获取选中的条目ID
+     * @returns {Array<string>} 选中的条目ID数组
      */
-    public getSelectedEntryIds(): string[] {
-        const selectedIds: string[] = [];
-        const checkboxes = document.querySelectorAll('.entry-checkbox:checked') as NodeListOf<HTMLInputElement>;
+    getSelectedEntryIds() {
+        const selectedIds = [];
+        const checkboxes = document.querySelectorAll('.entry-checkbox:checked');
         
         checkboxes.forEach(checkbox => {
             const chinese = checkbox.getAttribute('data-id') || '';
@@ -136,7 +132,7 @@ export class KnowledgeBaseTableRenderer {
     /**
      * 显示添加条目表单
      */
-    public showAddEntryForm(): void {
+    showAddEntryForm() {
         this.modals.showAddEntryForm();
     }
 }

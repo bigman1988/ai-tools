@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import multer from 'multer';
+import * as excelService from '../services/excel.js';
+
 const router = express.Router();
-const multer = require('multer');
-const excelService = require('../services/excel');
 
 // 配置文件上传
 const upload = multer({
@@ -15,7 +16,7 @@ const upload = multer({
 let vectorServiceAvailable = false;
 
 // 设置向量服务状态
-function setVectorServiceStatus(status) {
+export function setVectorServiceStatus(status) {
     vectorServiceAvailable = status;
 }
 
@@ -63,7 +64,4 @@ router.get('/export', async (req, res) => {
     }
 });
 
-module.exports = {
-    router,
-    setVectorServiceStatus
-};
+export { router };

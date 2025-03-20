@@ -1,11 +1,12 @@
-const express = require('express');
+import express from 'express';
+import { router as entriesRouter, setVectorServiceStatus as setEntriesVectorStatus } from './entries.js';
+import { router as excelRouter, setVectorServiceStatus as setExcelVectorStatus } from './excel.js';
+import { router as vectorSearchRouter, setVectorServiceStatus as setVectorSearchStatus } from './vector-search.js';
+
 const router = express.Router();
-const { router: entriesRouter, setVectorServiceStatus: setEntriesVectorStatus } = require('./entries');
-const { router: excelRouter, setVectorServiceStatus: setExcelVectorStatus } = require('./excel');
-const { router: vectorSearchRouter, setVectorServiceStatus: setVectorSearchStatus } = require('./vector-search');
 
 // 设置向量服务状态
-function setVectorServiceStatus(status) {
+export function setVectorServiceStatus(status) {
     setEntriesVectorStatus(status);
     setExcelVectorStatus(status);
     setVectorSearchStatus(status);
@@ -21,7 +22,4 @@ router.use('/entries', entriesRouter);
 router.use('/', excelRouter);
 router.use('/vector-search', vectorSearchRouter);
 
-module.exports = {
-    router,
-    setVectorServiceStatus
-};
+export { router };

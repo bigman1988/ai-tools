@@ -1,9 +1,9 @@
-const fetch = require('node-fetch');
-const { QdrantClient } = require('@qdrant/qdrant-js');
-const crypto = require('crypto'); // 导入crypto模块
-require('dotenv').config();  // 确保加载环境变量
+import fetch from 'node-fetch';
+import { QdrantClient } from '@qdrant/qdrant-js';
+import crypto from 'crypto'; // 导入crypto模块
+import 'dotenv/config';  // 确保加载环境变量
 
-class OllamaEmbeddingService {
+export class OllamaEmbeddingService {
     constructor(
         ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434',
         modelName = 'nomic-embed-text',
@@ -483,6 +483,4 @@ class OllamaEmbeddingService {
 }
 
 // 导出默认实例
-const embeddingService = new OllamaEmbeddingService();
-
-module.exports = { embeddingService, OllamaEmbeddingService };
+export const embeddingService = new OllamaEmbeddingService();

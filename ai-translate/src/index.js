@@ -1,57 +1,47 @@
 import './styles.css';
 import * as XLSX from 'xlsx';
-import { SheetData, TranslationTask, TranslationBatch, SourceLanguageConfig, LanguageMapping } from './types/types';
-import { readExcelFile, createExcelWorkbook } from './utils/excel';
-import { TranslationService } from './services/translator';
-import { ProgressBar } from './components/progress';
-
-declare global {
-    interface Window {
-        excelTranslatorInstance: ExcelTranslator;
-    }
-}
+import { readExcelFile, createExcelWorkbook } from './utils/excel.js';
+import { TranslationService } from './services/translator.js';
+import { ProgressBar } from './components/progress.js';
 
 class ExcelTranslator {
-    private tableOutput: HTMLElement | null = null;
-    private data: { [sheet: string]: { headerRows: string[][], rows: string[][] } } = {};
-    private currentSheet: string = '';
-    private sourceLangSelect: HTMLSelectElement | null = null;
-    private apiKey: string = '';
-    private currentFileName: string = '';
-    private originalWorkbook: XLSX.WorkBook | null = null;
-    private shouldStopTranslation: boolean = false;
-    private progressBar: ProgressBar;
-    private sourceColumnIndex: number = -1;
-    private targetLanguages: string[] = [];
-    private targetColumnIndices: number[] = [];
-
-    private readonly sourceLanguages = ['简体中文', '英语'];
-
-    private readonly languageMappings = [
-        { columnHeader: '英语', targetLang: 'English' },
-        { columnHeader: '日语', targetLang: 'Japanese' },
-        { columnHeader: '韩语', targetLang: 'Korean' },
-        { columnHeader: '西班牙语', targetLang: 'Spanish' },
-        { columnHeader: '法语', targetLang: 'French' },
-        { columnHeader: '德语', targetLang: 'German' },
-        { columnHeader: '俄语', targetLang: 'Russian' },
-        { columnHeader: '泰语', targetLang: 'Thai' },
-        { columnHeader: '意大利语', targetLang: 'Italian' },
-        { columnHeader: '印尼语', targetLang: 'Indonesian' },
-        { columnHeader: '葡萄牙语', targetLang: 'Portuguese' }
-    ];
-
-    private readonly sourceLanguageConfig = {
-        '简体中文': 'Chinese',
-        '英语': 'English'
-    };
-
-    private batchSize = 10; // 每批处理的行数
-    private currentBatchNumber = 0;
-
     constructor() {
         this.tableOutput = document.getElementById('tableOutput');
+        this.data = {};
+        this.currentSheet = '';
+        this.sourceLangSelect = null;
+        this.apiKey = '';
+        this.currentFileName = '';
+        this.originalWorkbook = null;
+        this.shouldStopTranslation = false;
         this.progressBar = new ProgressBar();
+        this.sourceColumnIndex = -1;
+        this.targetLanguages = [];
+        this.targetColumnIndices = [];
+        
+        this.sourceLanguages = ['简体中文', '英语'];
+        
+        this.languageMappings = [
+            { columnHeader: '英语', targetLang: 'English' },
+            { columnHeader: '日语', targetLang: 'Japanese' },
+            { columnHeader: '韩语', targetLang: 'Korean' },
+            { columnHeader: '西班牙语', targetLang: 'Spanish' },
+            { columnHeader: '法语', targetLang: 'French' },
+            { columnHeader: '德语', targetLang: 'German' },
+            { columnHeader: '俄语', targetLang: 'Russian' },
+            { columnHeader: '泰语', targetLang: 'Thai' },
+            { columnHeader: '意大利语', targetLang: 'Italian' },
+            { columnHeader: '印尼语', targetLang: 'Indonesian' },
+            { columnHeader: '葡萄牙语', targetLang: 'Portuguese' }
+        ];
+        
+        this.sourceLanguageConfig = {
+            '简体中文': 'Chinese',
+            '英语': 'English'
+        };
+        
+        this.batchSize = 10; // 每批处理的行数
+        this.currentBatchNumber = 0;
         
         // 检查是否已经初始化过，避免重复注册事件监听器
         if (!window.excelTranslatorInstance) {
@@ -68,7 +58,7 @@ class ExcelTranslator {
             console.log('已从环境变量加载API密钥');
         }
         
-        const apiKeyInput = document.getElementById('apiKeyInput') as HTMLInputElement;
+        const apiKeyInput = document.getElementById('apiKeyInput');
         if (apiKeyInput) {
             // 如果环境变量中有API密钥，则显示在输入框中（隐藏部分字符）
             if (this.apiKey) {
@@ -79,7 +69,7 @@ class ExcelTranslator {
             
             // 仍然允许用户手动输入/修改API密钥
             apiKeyInput.addEventListener('change', (e) => {
-                const inputValue = (e.target as HTMLInputElement).value;
+                const inputValue = e.target.value;
                 if (inputValue && inputValue !== apiKeyInput.getAttribute('placeholder')) {
                     this.apiKey = inputValue;
                     console.log('已使用手动输入的API密钥');
@@ -88,9 +78,9 @@ class ExcelTranslator {
         }
     }
 
-    private async translateCell(text: string, targetLang: string): Promise<string> {
+    async translateCell(text, targetLang) {
         // 获取选择的源语言
-        const sourceLangSelect = document.getElementById('sourceLang') as HTMLSelectElement;
+        const sourceLangSelect = document.getElementById('sourceLang');
         const sourceLangValue = sourceLangSelect?.value || 'zh-CN';
         
         // 根据选择的值确定源语言代码
@@ -98,7 +88,7 @@ class ExcelTranslator {
         
         console.log(`翻译请求 - 源语言: ${sourceLang}, 目标语言: ${targetLang}, 文本: ${text}`);
         const url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
-
+        
         try {
             const response = await fetch(url, {
                 method: 'POST',
@@ -133,15 +123,15 @@ class ExcelTranslator {
 
             const data = await response.json();
             return data.choices[0].message.content.trim();
-        } catch (error: any) {
+        } catch (error) {
             console.error('翻译出错:', error);
             this.log(`翻译出错: ${error.message}`, 'error');
             throw error;
         }
     }
     
-    private async handleFileSelect(event: Event): Promise<void> {
-        const input = event.target as HTMLInputElement;
+    async handleFileSelect(event) {
+        const input = event.target;
         if (!input.files || !input.files[0]) return;
 
         try {
@@ -183,9 +173,9 @@ class ExcelTranslator {
         }
     }
 
-    private async handleTranslateClick(): Promise<void> {
-        const translateBtn = document.getElementById('translateBtn') as HTMLButtonElement;
-        const stopBtn = document.getElementById('stopTranslateBtn') as HTMLButtonElement;
+    async handleTranslateClick() {
+        const translateBtn = document.getElementById('translateBtn');
+        const stopBtn = document.getElementById('stopTranslateBtn');
         translateBtn.style.display = 'none';
         stopBtn.style.display = 'inline-block';
         this.progressBar.show();
@@ -203,7 +193,7 @@ class ExcelTranslator {
         }
 
         // 获取选择的源语言
-        const sourceLangSelect = document.getElementById('sourceLang') as HTMLSelectElement;
+        const sourceLangSelect = document.getElementById('sourceLang');
         const sourceLangValue = sourceLangSelect?.value || 'zh-CN';
         
         // 根据选择的值确定源语言名称和API代码
@@ -245,7 +235,7 @@ class ExcelTranslator {
         }
         
         // 确定目标语言列
-        const targetColumns: {index: number, langCode: string, display: string}[] = [];
+        const targetColumns = [];
         
         // 遍历表头查找所有目标语言
         for (let i = 0; i < headerRow.length; i++) {
@@ -281,7 +271,7 @@ class ExcelTranslator {
         
         try {
             // 1. 收集所有需要翻译的源文本和目标单元格
-            const translationTasks: TranslationTask[] = [];
+            const translationTasks = [];
             
             this.log('正在收集需要翻译的内容...', 'info');
             
@@ -296,8 +286,6 @@ class ExcelTranslator {
                 
                 // 获取源文本
                 const sourceText = row[sourceColumnIndex];
-                
-                // 不要打印每个单元格的详细信息，只在出错时才打印
                 
                 // 安全地检查源文本
                 try {
@@ -357,11 +345,11 @@ class ExcelTranslator {
             this.log(`找到 ${translationTasks.length} 个需要翻译的单元格`, 'info');
             
             // 2. 将任务按目标语言分组，然后每组最多20条
-            const batches: TranslationBatch[] = [];
+            const batches = [];
             let batchId = 1;
             
             // 按目标语言分组
-            const tasksByLanguage: { [langCode: string]: TranslationTask[] } = {};
+            const tasksByLanguage = {};
             
             // 将任务按目标语言分组
             for (const task of translationTasks) {
@@ -381,7 +369,7 @@ class ExcelTranslator {
                 this.log(`处理目标语言 ${langDisplay} 的 ${tasksForLanguage.length} 个任务`, 'info');
                 
                 // 将语言组内的任务划分为小组，每组最多20个任务且总字符数不超过2000
-                let currentBatchTasks: TranslationTask[] = [];
+                let currentBatchTasks = [];
                 let currentCharCount = 0;
                 const MAX_CHAR_COUNT = 2000; // 最大字符数限制
                 const MAX_TASKS_PER_BATCH = 20; // 每批次的任务数量限制
@@ -393,7 +381,7 @@ class ExcelTranslator {
                     if (currentBatchTasks.length >= MAX_TASKS_PER_BATCH || currentCharCount + (typeof task.text === 'string' ? task.text.length : 0) > MAX_CHAR_COUNT) {
                         if (currentBatchTasks.length > 0) {
                             // 创建批次对象
-                            const newBatch: TranslationBatch = {
+                            const newBatch = {
                                 tasks: [...currentBatchTasks],
                                 batchId: batchId++,
                                 totalCharCount: currentCharCount
@@ -411,7 +399,7 @@ class ExcelTranslator {
                     // 如果单个任务的字符数就超过2000，则单独处理该任务
                     if (task.text.length > MAX_CHAR_COUNT) {
                         this.log(`警告: 任务字符数(${task.text.length})超过限制(${MAX_CHAR_COUNT})，单独处理`, 'warning');
-                        const singleTaskBatch: TranslationBatch = {
+                        const singleTaskBatch = {
                             tasks: [task],
                             batchId: batchId++,
                             totalCharCount: task.text.length
@@ -426,7 +414,7 @@ class ExcelTranslator {
                 
                 // 添加最后一个批次
                 if (currentBatchTasks.length > 0) {
-                    const newBatch: TranslationBatch = {
+                    const newBatch = {
                         tasks: currentBatchTasks,
                         batchId: batchId++,
                         totalCharCount: currentCharCount
@@ -491,7 +479,7 @@ class ExcelTranslator {
             // 在processBatches方法中处理单元格更新
             this.log('所有翻译任务完成', 'success');
             
-        } catch (error: any) {
+        } catch (error) {
             // 记录更详细的错误信息
             const errorMessage = error.message || String(error);
             const errorStack = error.stack || 'No stack trace available';
@@ -517,22 +505,22 @@ class ExcelTranslator {
         }
     }
 
-    private createBatches<T>(items: T[], batchSize: number): T[][] {
-        const batches: T[][] = [];
+    createBatches(items, batchSize) {
+        const batches = [];
         for (let i = 0; i < items.length; i += batchSize) {
             batches.push(items.slice(i, i + batchSize));
         }
         return batches;
     }
 
-    private initializeUI(): void {
+    initializeUI() {
         // 初始化进度条
         this.progressBar.show();
         this.progressBar.updateProgress({ current: 0, total: 100 });
         this.progressBar.hide();
 
         // 绑定停止按钮事件
-        const stopBtn = document.getElementById('stopTranslateBtn') as HTMLButtonElement;
+        const stopBtn = document.getElementById('stopTranslateBtn');
         if (stopBtn) {
             stopBtn.addEventListener('click', () => {
                 this.shouldStopTranslation = true;
@@ -542,13 +530,13 @@ class ExcelTranslator {
         }
     }
 
-    private initializeEventListeners(): void {
-        const fileInput = document.getElementById('fileInput') as HTMLInputElement;
-        const uploadBtn = document.getElementById('uploadBtn') as HTMLButtonElement;
-        const translateBtn = document.getElementById('translateBtn') as HTMLButtonElement;
-        const exportBtn = document.getElementById('exportBtn') as HTMLButtonElement;
-        const actionButtons = document.getElementById('actionButtons') as HTMLElement;
-        this.sourceLangSelect = document.getElementById('sourceLang') as HTMLSelectElement;
+    initializeEventListeners() {
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const translateBtn = document.getElementById('translateBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        const actionButtons = document.getElementById('actionButtons');
+        this.sourceLangSelect = document.getElementById('sourceLang');
 
         // 处理文件选择按钮点击
         if (uploadBtn) {
@@ -569,7 +557,7 @@ class ExcelTranslator {
         if (exportBtn) exportBtn.addEventListener('click', () => this.exportToExcel());
     }
 
-    private async exportToExcel(): Promise<void> {
+    async exportToExcel() {
         if (!this.currentSheet || !this.data[this.currentSheet]) {
             this.log('没有可导出的数据', 'warning');
             return;
@@ -588,7 +576,7 @@ class ExcelTranslator {
         }
     }
 
-    private getExcelColumnName(index: number): string {
+    getExcelColumnName(index) {
         let columnName = '';
         while (index >= 0) {
             columnName = String.fromCharCode(65 + (index % 26)) + columnName;
@@ -597,7 +585,7 @@ class ExcelTranslator {
         return columnName;
     }
 
-    private log(message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info'): void {
+    log(message, type = 'info') {
         const logContainer = document.getElementById('logOutput');
         if (!logContainer) return;
 
@@ -608,8 +596,8 @@ class ExcelTranslator {
         logContainer.scrollTop = logContainer.scrollHeight;
     }
 
-    private updateSheetSelector(sheets: string[]): void {
-        const sheetSelector = document.getElementById('sheetSelector') as HTMLSelectElement;
+    updateSheetSelector(sheets) {
+        const sheetSelector = document.getElementById('sheetSelector');
         if (!sheetSelector) return;
 
         // 清除现有选项
@@ -626,11 +614,11 @@ class ExcelTranslator {
 
     /**
      * 直接更新DOM中的单元格内容，而不重新渲染整个表格
-     * @param rowIndex 行索引
-     * @param colIndex 列索引
-     * @param text 新的单元格内容
+     * @param {number} rowIndex 行索引
+     * @param {number} colIndex 列索引
+     * @param {string} text 新的单元格内容
      */
-    private updateCellInDOM(rowIndex: number, colIndex: number, text: string): void {
+    updateCellInDOM(rowIndex, colIndex, text) {
         const tableOutput = document.getElementById('tableOutput');
         if (!tableOutput) return;
         
@@ -650,7 +638,7 @@ class ExcelTranslator {
         // 计算实际的DOM行索引，考虑到我们可能隐藏了一些行
         // 我们需要找到实际显示的行，而不是隐藏的行
         const rows = table.querySelectorAll('tr');
-        let targetRow: HTMLTableRowElement | undefined = undefined;
+        let targetRow = undefined;
         
         // 遍历所有行，找到对应的行
         for (let i = 0; i < rows.length; i++) {
@@ -666,14 +654,14 @@ class ExcelTranslator {
         
         // 找到对应的单元格，注意第一列是行号，所以需要+1
         if (colIndex + 1 < targetRow.children.length) {
-            const cell = targetRow.children[colIndex + 1] as HTMLElement;
+            const cell = targetRow.children[colIndex + 1];
             if (cell) {
                 cell.textContent = text;
             }
         }
     }
     
-    private displaySheet(): void {
+    displaySheet() {
         // 检查tableOutput是否存在
         this.tableOutput = document.getElementById('tableOutput');
         if (!this.tableOutput || !this.currentSheet || !this.data[this.currentSheet]) {
@@ -839,8 +827,6 @@ class ExcelTranslator {
             document.head.appendChild(style);
         }
     }
-
-    // ... 其他代码保持不变 ...
 }
 
 // 初始化应用

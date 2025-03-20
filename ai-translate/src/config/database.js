@@ -1,11 +1,11 @@
-const mysql = require('mysql2/promise');
-const dotenv = require('dotenv');
+import mysql from 'mysql2/promise';
+import dotenv from 'dotenv';
 
 // 加载环境变量
 dotenv.config();
 
 // 创建数据库连接池
-const pool = mysql.createPool({
+export const pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
@@ -16,7 +16,7 @@ const pool = mysql.createPool({
 });
 
 // 初始化数据库
-async function initializeDatabase() {
+export async function initializeDatabase() {
     try {
         // 创建translate表（如果不存在）
         await pool.execute(`
@@ -45,8 +45,3 @@ async function initializeDatabase() {
         throw error;
     }
 }
-
-module.exports = {
-    pool,
-    initializeDatabase
-};
