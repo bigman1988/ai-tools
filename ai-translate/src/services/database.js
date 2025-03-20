@@ -14,7 +14,7 @@ class DatabaseService {
      * @param {number} options.offset - 结果偏移量
      * @returns {Promise<Array>} - 翻译条目列表
      */
-    async getEntries({ search, limit = 100, offset = 0 }) {
+    async getEntries({ search, limit, offset } = {}) {
         try {
             // 确保limit和offset是整数
             const safeLimit = parseInt(limit) || 100;
@@ -23,10 +23,12 @@ class DatabaseService {
             let sql, params = [];
             
             if (search) {
+                // 对于搜索操作，保留LIMIT以避免返回过多结果
                 sql = 'SELECT * FROM `translate` WHERE Chinese LIKE ? OR English LIKE ? LIMIT ' + safeLimit + ' OFFSET ' + safeOffset;
                 params = [`%${search}%`, `%${search}%`];
             } else {
-                sql = 'SELECT * FROM `translate` LIMIT ' + safeLimit + ' OFFSET ' + safeOffset;
+                // 对于初始加载，获取所有数据（不使用LIMIT）
+                sql = 'SELECT * FROM `translate`';
             }
             
             console.log('执行SQL查询:', sql);

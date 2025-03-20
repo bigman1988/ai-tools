@@ -61,6 +61,13 @@ class OllamaEmbeddingService {
      */
     async generateEmbedding(text) {
         try {
+            if (!text || text.trim() === '') {
+                console.log('文本为空，无法生成向量');
+                return null;
+            }
+            
+            console.log(`正在为文本生成向量: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`);
+            
             const response = await fetch(`${this.ollamaUrl}/api/embeddings`, {
                 method: 'POST',
                 headers: {
@@ -69,15 +76,25 @@ class OllamaEmbeddingService {
                 body: JSON.stringify({
                     model: this.modelName,
                     prompt: text
-                })
+                }),
+                timeout: 30000 // 增加超时时间到30秒
             });
 
             if (!response.ok) {
-                throw new Error(`Ollama API错误: ${response.status} ${response.statusText}`);
+                const errorText = await response.text();
+                throw new Error(`Ollama API错误: ${response.status} ${response.statusText} - ${errorText}`);
             }
 
             const data = await response.json();
-            return data.embedding;
+            
+            // 检查返回的数据结构
+            if (!data || !data.embedding) {
+                console.error('Ollama API返回的数据结构不正确:', JSON.stringify(data).substring(0, 200));
+                return null;
+            }
+            
+            console.log(`成功生成向量，维度: ${data.embedding.length}`);
+            return data;
         } catch (error) {
             console.error('生成嵌入向量失败:', error);
             // 不抛出错误，而是返回null
@@ -105,7 +122,7 @@ class OllamaEmbeddingService {
                 points: [
                     {
                         id: uuid,
-                        vector: embedding,
+                        vector: embedding.embedding,
                         payload: {
                             text,
                             ...metadata
@@ -130,54 +147,71 @@ class OllamaEmbeddingService {
      */
     async storeEntryVectors(entry) {
         try {
-            if (!entry.Chinese && !entry.English) {
-                console.error('中文和英文内容均为空，无法生成向量');
-                return { success: false, id: null };
-            }
-
-            // 生成中文向量（如果有中文内容）
-            let vector_cn = null;
-            if (entry.Chinese) {
-                vector_cn = await this.generateEmbedding(entry.Chinese);
-                if (vector_cn === null) {
-                    console.error('生成中文嵌入向量失败');
+            // 检查集合是否存在，如果不存在则初始化
+            try {
+                const collections = await this.qdrantClient.getCollections();
+                const collectionExists = collections.collections.some(c => c.name === this.collectionName);
+                
+                if (!collectionExists) {
+                    console.log(`集合不存在，正在创建: ${this.collectionName}`);
+                    await this.initializeCollection();
                 }
+            } catch (collectionError) {
+                console.error('检查集合时出错:', collectionError);
+                await this.initializeCollection();
             }
-
-            // 生成英文向量（如果有英文内容）
-            let vector_en = null;
-            if (entry.English) {
-                vector_en = await this.generateEmbedding(entry.English);
-                if (vector_en === null) {
-                    console.error('生成英文嵌入向量失败');
-                }
-            }
-
-            // 如果两个向量都生成失败，则返回失败
-            if (vector_cn === null && vector_en === null) {
-                return { success: false, id: null };
-            }
-
-            // 使用UUID作为ID
+            
+            // 生成UUID作为向量ID
             const uuid = crypto.randomUUID();
             
-            // 准备完整的payload数据
+            // 准备元数据
             const payload = {
-                Chinese: entry.Chinese || '',
-                English: entry.English || '',
-                Japanese: entry.Japanese || '',
-                Korean: entry.Korean || '',
-                Spanish: entry.Spanish || '',
-                French: entry.French || '',
-                German: entry.German || '',
-                Russian: entry.Russian || '',
-                Thai: entry.Thai || '',
-                Italian: entry.Italian || '',
-                Indonesian: entry.Indonesian || '',
-                Portuguese: entry.Portuguese || ''
+                chinese: entry.Chinese || '',
+                english: entry.English || '',
+                japanese: entry.Japanese || '',
+                korean: entry.Korean || '',
+                spanish: entry.Spanish || '',
+                french: entry.French || '',
+                german: entry.German || '',
+                russian: entry.Russian || '',
+                thai: entry.Thai || '',
+                italian: entry.Italian || '',
+                indonesian: entry.Indonesian || '',
+                portuguese: entry.Portuguese || ''
             };
-
-            // 构建要存储的点
+            
+            // 生成中文和英文的向量嵌入
+            let vector_cn = null;
+            let vector_en = null;
+            
+            if (entry.Chinese && entry.Chinese.trim() !== '') {
+                try {
+                    const cnEmbedding = await this.generateEmbedding(entry.Chinese);
+                    if (cnEmbedding && cnEmbedding.embedding) {
+                        vector_cn = cnEmbedding.embedding;
+                    }
+                } catch (cnError) {
+                    console.error('生成中文向量失败:', cnError);
+                }
+            }
+            
+            if (entry.English && entry.English.trim() !== '') {
+                try {
+                    const enEmbedding = await this.generateEmbedding(entry.English);
+                    if (enEmbedding && enEmbedding.embedding) {
+                        vector_en = enEmbedding.embedding;
+                    }
+                } catch (enError) {
+                    console.error('生成英文向量失败:', enError);
+                }
+            }
+            
+            // 如果没有成功生成任何向量，则返回失败
+            if (!vector_cn && !vector_en) {
+                console.error('无法为条目生成向量嵌入:', entry.Chinese);
+                return { success: false, id: null, error: '无法生成向量嵌入' };
+            }
+            
             const point = {
                 id: uuid,
                 // 如果中文向量存在则使用中文向量，否则使用英文向量
@@ -192,16 +226,37 @@ class OllamaEmbeddingService {
             }
 
             // 存储到Qdrant
-            await this.qdrantClient.upsert(this.collectionName, {
-                wait: true,
-                points: [point]
-            });
-            
-            console.log(`成功存储翻译条目向量: ${uuid}`);
-            return { success: true, id: uuid };
+            try {
+                await this.qdrantClient.upsert(this.collectionName, {
+                    wait: true,
+                    points: [point]
+                });
+                
+                console.log(`成功存储翻译条目向量: ${uuid}`);
+                return { success: true, id: uuid };
+            } catch (upsertError) {
+                console.error('向Qdrant存储向量失败:', upsertError);
+                
+                // 尝试再次初始化集合并重试
+                try {
+                    console.log('尝试重新初始化集合并重试...');
+                    await this.initializeCollection();
+                    
+                    await this.qdrantClient.upsert(this.collectionName, {
+                        wait: true,
+                        points: [point]
+                    });
+                    
+                    console.log(`重试成功，已存储翻译条目向量: ${uuid}`);
+                    return { success: true, id: uuid };
+                } catch (retryError) {
+                    console.error('重试存储向量失败:', retryError);
+                    return { success: false, id: null, error: retryError.message };
+                }
+            }
         } catch (error) {
             console.error('存储翻译条目向量失败:', error);
-            return { success: false, id: null };
+            return { success: false, id: null, error: error.message };
         }
     }
 
@@ -313,7 +368,7 @@ class OllamaEmbeddingService {
             if (language === 'english') {
                 // 如果是英文搜索，优先使用vector_en字段
                 searchResults = await this.qdrantClient.search(this.collectionName, {
-                    vector: embedding,
+                    vector: embedding.embedding,
                     limit,
                     with_payload: true,
                     with_vectors: true  // 获取向量数据
@@ -323,7 +378,7 @@ class OllamaEmbeddingService {
                 searchResults = searchResults.map(result => {
                     // 如果存在英文向量，计算与查询向量的相似度
                     if (result.payload && result.payload.vector_en) {
-                        const similarity = this.calculateCosineSimilarity(embedding, result.payload.vector_en);
+                        const similarity = this.calculateCosineSimilarity(embedding.embedding, result.payload.vector_en);
                         return { ...result, score: similarity };
                     }
                     return result;
@@ -331,7 +386,7 @@ class OllamaEmbeddingService {
             } else {
                 // 如果是中文搜索，优先使用vector_cn字段
                 searchResults = await this.qdrantClient.search(this.collectionName, {
-                    vector: embedding,
+                    vector: embedding.embedding,
                     limit,
                     with_payload: true,
                     with_vectors: true  // 获取向量数据
@@ -341,7 +396,7 @@ class OllamaEmbeddingService {
                 searchResults = searchResults.map(result => {
                     // 如果存在中文向量，计算与查询向量的相似度
                     if (result.payload && result.payload.vector_cn) {
-                        const similarity = this.calculateCosineSimilarity(embedding, result.payload.vector_cn);
+                        const similarity = this.calculateCosineSimilarity(embedding.embedding, result.payload.vector_cn);
                         return { ...result, score: similarity };
                     }
                     return result;
