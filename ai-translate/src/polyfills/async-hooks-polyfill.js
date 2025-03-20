@@ -1,5 +1,5 @@
 // 简单的async_hooks polyfill
-module.exports = {
+export default {
   // 提供空的实现
   createHook: () => ({ enable: () => {}, disable: () => {} }),
   executionAsyncId: () => 0,

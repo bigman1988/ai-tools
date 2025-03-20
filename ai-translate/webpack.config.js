@@ -1,9 +1,14 @@
-const path = require('path');
-const HtmlWebpackPlugin = require('html-webpack-plugin');
-const Dotenv = require('dotenv-webpack');
-const webpack = require('webpack');
+import path from 'path';
+import HtmlWebpackPlugin from 'html-webpack-plugin';
+import Dotenv from 'dotenv-webpack';
+import webpack from 'webpack';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
-module.exports = {
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+export default {
     entry: {
         main: './src/index.js',
         knowledgeBase: './src/knowledge-base.js'
@@ -20,18 +25,18 @@ module.exports = {
     resolve: {
         extensions: ['.js'],
         fallback: {
-            "buffer": require.resolve("buffer/"),
-            "crypto": require.resolve("crypto-browserify"),
-            "stream": require.resolve("stream-browserify"),
-            "util": require.resolve("util/"),
-            "process": require.resolve("process/browser"),
-            "zlib": require.resolve("browserify-zlib"),
-            "url": require.resolve("url/"),
-            "vm": require.resolve("vm-browserify"),
-            "timers": require.resolve("timers-browserify"),
-            "assert": require.resolve("assert/"),
-            "net": require.resolve("net-browserify"),
-            "tls": require.resolve("tls-browserify"),
+            "buffer": 'buffer/',
+            "crypto": 'crypto-browserify',
+            "stream": 'stream-browserify',
+            "util": 'util/',
+            "process": 'process/browser',
+            "zlib": 'browserify-zlib',
+            "url": 'url/',
+            "vm": 'vm-browserify',
+            "timers": 'timers-browserify',
+            "assert": 'assert/',
+            "net": 'net-browserify',
+            "tls": 'tls-browserify',
             "async_hooks": false,
             "fs": false,
             "path": false,
@@ -64,7 +69,7 @@ module.exports = {
         // 添加空的async_hooks模块
         new webpack.NormalModuleReplacementPlugin(
             /async_hooks/,
-            require.resolve('./src/polyfills/async-hooks-polyfill.js')
+            './src/polyfills/async-hooks-polyfill.js'
         )
     ],
     optimization: {
