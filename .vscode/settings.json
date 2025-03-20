@@ -2,5 +2,26 @@
     "marscode.codeCompletionPro": {
         "enableCodeCompletionPro": false
     },
-    "marscode.enableInlineCommand": true
+    "marscode.enableInlineCommand": true,
+    "js/ts.implicitProjectConfig.checkJs": false,
+    "js/ts.implicitProjectConfig.module": "ESNext",
+    "javascript.validate.enable": true,
+    "typescript.validate.enable": false,
+    "typescript.disableAutomaticTypeAcquisition": true,
+    "typescript.tsc.autoDetect": "off",
+    "typescript.tsserver.enable": false,
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/CVS": true,
+        "**/.DS_Store": true,
+        "**/node_modules": true,
+        "**/*.d.ts": true
+    },
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/bower_components": true,
+        "**/*.d.ts": true
+    }
 }

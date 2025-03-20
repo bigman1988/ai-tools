@@ -7,13 +7,13 @@
       "name": "启动翻译工具服务器",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/ai-translate/src/server.js",
-      "outFiles": ["${workspaceFolder}/**/*.js"],
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "cwd": "${workspaceFolder}/ai-translate",
       "env": {
         "NODE_ENV": "development"
-      }
+      },
+      "runtimeArgs": ["--experimental-modules"]
     },
     {
       "type": "node",
@@ -28,7 +28,6 @@
       "name": "调试Excel导入",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/ai-translate/src/server.js",
-      "outFiles": ["${workspaceFolder}/**/*.js"],
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "cwd": "${workspaceFolder}/ai-translate",
@@ -37,9 +36,7 @@
         "DEBUG": "excel-import:*"
       },
       "args": [],
-      "sourceMaps": true,
-      "smartStep": true,
-      "breakOnFirstLine": false
+      "runtimeArgs": ["--experimental-modules"]
     }
   ]
 }
