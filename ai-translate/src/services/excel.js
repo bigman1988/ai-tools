@@ -1,8 +1,8 @@
-import XLSX from 'xlsx';
+import * as XLSX from 'xlsx';
 import appConfig from '../config/app.js';
 import { databaseService as dbService } from './database.js';
 import { pool } from '../config/database.js';
-import { embeddingService } from './embedding.js';
+import { embeddingService } from './embedding-instance.js';
 
 // 从配置中获取 excel 配置
 const excel = appConfig.excel;

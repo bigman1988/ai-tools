@@ -1,7 +1,10 @@
 import fetch from 'node-fetch';
 import { QdrantClient } from '@qdrant/qdrant-js';
 import crypto from 'crypto'; // 导入crypto模块
-import 'dotenv/config';  // 确保加载环境变量
+// 不再使用 dotenv/config，在服务器启动时已加载环境变量
+
+// 单例实例
+let instance = null;
 
 export class OllamaEmbeddingService {
     constructor(
@@ -11,20 +14,31 @@ export class OllamaEmbeddingService {
         collectionName = 'translation_embeddings',
         vectorSize = 768
     ) {
+        // 如果已经有实例，直接返回
+        if (instance) {
+            console.log('已经存在 OllamaEmbeddingService 实例，返回现有实例');
+            return instance;
+        }
+        
+        console.log('初始化 OllamaEmbeddingService');
         this.ollamaUrl = ollamaUrl;
         this.modelName = modelName;
         this.collectionName = collectionName;
         this.vectorSize = vectorSize;
+        this.qdrantUrl = qdrantUrl;
         
-        // 初始化Qdrant客户端，启用版本兼容性检查
-        this.qdrantClient = new QdrantClient({ 
-            url: qdrantUrl,
+        // 初始化Qdrant客户端
+        this.qdrantClient = new QdrantClient({
+            url: this.qdrantUrl,
             checkCompatibility: true,  // 启用版本兼容性检查
             timeout: 10000  // 增加超时时间到10秒
         });
         
         console.log(`实际使用的Qdrant URL: ${qdrantUrl}`);
         console.log(`实际使用的Ollama URL: ${ollamaUrl}`);
+        
+        // 保存实例
+        instance = this;
     }
 
     /**
@@ -481,6 +495,3 @@ export class OllamaEmbeddingService {
         }
     }
 }
-
-// 导出默认实例
-export const embeddingService = new OllamaEmbeddingService();

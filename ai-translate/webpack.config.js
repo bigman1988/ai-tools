@@ -13,7 +13,8 @@ export default {
         main: './src/index.js',
         knowledgeBase: './src/knowledge-base.js'
     },
-    mode: 'production',
+    mode: 'development', 
+    devtool: 'source-map', 
     module: {
         rules: [
             {
@@ -37,6 +38,7 @@ export default {
             "assert": 'assert/',
             "net": 'net-browserify',
             "tls": 'tls-browserify',
+            "os": false, 
             "async_hooks": false,
             "fs": false,
             "path": false,
@@ -66,10 +68,13 @@ export default {
             process: 'process/browser',
             Buffer: ['buffer', 'Buffer']
         }),
-        // 添加空的async_hooks模块
         new webpack.NormalModuleReplacementPlugin(
             /async_hooks/,
             './src/polyfills/async-hooks-polyfill.js'
+        ),
+        new webpack.NormalModuleReplacementPlugin(
+            /^os$/,
+            './src/polyfills/noop.js'
         )
     ],
     optimization: {
@@ -79,11 +84,9 @@ export default {
         }
     },
     devServer: {
-        static: {
-            directory: path.join(__dirname, 'dist'),
-        },
-        compress: true,
-        port: 8083,
-        open: true
+        static: './dist',
+        port: 8084,
+        open: true,
+        hot: true 
     }
 };

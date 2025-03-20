@@ -1,5 +1,5 @@
 import express from 'express';
-import { embeddingService } from '../services/embedding.js';
+import { embeddingService } from '../services/embedding-instance.js';
 
 const router = express.Router();
 

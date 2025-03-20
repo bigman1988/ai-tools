@@ -1,6 +1,9 @@
 /**
  * 翻译服务类
  */
+import { embeddingService } from './embedding-instance.js';
+import fetch from 'node-fetch';
+
 export class TranslationService {
     /**
      * 创建翻译服务实例
@@ -31,6 +34,76 @@ export class TranslationService {
      */
     resetStopFlag() {
         this.shouldStopTranslation = false;
+    }
+
+    /**
+     * 从知识库中获取翻译记忆
+     * @param {string} text - 源文本
+     * @param {string} sourceLanguage - 源语言
+     * @param {string} targetLanguage - 目标语言
+     * @returns {Promise<Array>} - 翻译记忆列表
+     */
+    async getTranslationMemory(text, sourceLanguage, targetLanguage) {
+        try {
+            if (!text || text.trim() === '') {
+                return [];
+            }
+
+            // 确定向量搜索的语言类型
+            const vectorLanguage = sourceLanguage === 'Chinese' ? 'chinese' : 'english';
+            
+            // 搜索相似的翻译条目
+            const similarEntries = await embeddingService.searchSimilar(text, vectorLanguage, 5);
+            
+            // 如果没有找到相似条目，返回空数组
+            if (!similarEntries || similarEntries.length === 0) {
+                console.log('未找到相似的翻译记忆');
+                return [];
+            }
+            
+            // 确定源语言和目标语言在数据库中的字段名
+            const sourceField = sourceLanguage === 'Chinese' ? 'Chinese' : 'English';
+            let targetField;
+            
+            // 根据目标语言确定字段名
+            switch (targetLanguage) {
+                case 'Japanese': targetField = 'Japanese'; break;
+                case 'Korean': targetField = 'Korean'; break;
+                case 'Spanish': targetField = 'Spanish'; break;
+                case 'French': targetField = 'French'; break;
+                case 'German': targetField = 'German'; break;
+                case 'Russian': targetField = 'Russian'; break;
+                case 'Thai': targetField = 'Thai'; break;
+                case 'Italian': targetField = 'Italian'; break;
+                case 'Indonesian': targetField = 'Indonesian'; break;
+                case 'Portuguese': targetField = 'Portuguese'; break;
+                case 'English': targetField = 'English'; break;
+                case 'Chinese': targetField = 'Chinese'; break;
+                default: targetField = targetLanguage;
+            }
+            
+            // 构建翻译记忆列表
+            const tmList = [];
+            
+            for (const entry of similarEntries) {
+                const source = entry.payload[sourceField];
+                const target = entry.payload[targetField];
+                
+                // 只有当源和目标都有值时才添加到翻译记忆
+                if (source && target && source.trim() !== '' && target.trim() !== '') {
+                    tmList.push({
+                        source: source,
+                        target: target
+                    });
+                }
+            }
+            
+            console.log(`找到 ${tmList.length} 条翻译记忆`);
+            return tmList;
+        } catch (error) {
+            console.error('获取翻译记忆失败:', error);
+            return [];
+        }
     }
 
     /**
@@ -106,10 +179,25 @@ export class TranslationService {
                     return false;
                 }
                 
+                // 检查目标语言是否存在
+                if (!validTasks[0].targetLang) {
+                    console.error('错误: 目标语言未定义', validTasks[0]);
+                    this.logCallback('错误: 目标语言未定义', 'error');
+                    return false;
+                }
+                
                 console.log(`翻译批次 - 目标语言: ${validTasks[0].targetLang}, 共${validTasks.length}个任务`);
                 
                 // 获取目标语言
                 const targetLang = validTasks[0].targetLang;
+                
+                // 如果批次中只有一个任务，使用单个翻译方法
+                if (validTasks.length === 1) {
+                    const task = validTasks[0];
+                    const success = await this.translateSingle(task, sourceLanguage);
+                    batch.success = success;
+                    return success;
+                }
                 
                 // 收集所有任务的文本和目标语言
                 const response = await fetch(this.apiEndpoint, {
@@ -200,99 +288,96 @@ export class TranslationService {
                     textType: typeof task.text
                 })));
                 
-                this.logCallback(`批次 ${batch.batchId} 翻译失败: ${error.message || error}`, 'error');
+                this.logCallback(`翻译失败: ${error.message}`, 'error');
+                
                 // 标记翻译失败
                 batch.success = false;
                 return false;
             }
-            
-            // 标记批次已完成
-            batch.completed = batch.tasks.length;
-            
         } catch (error) {
-            console.error('批次翻译失败:', error);
-            
-            // 打印错误堆栈和批次详细信息
-            console.error('错误堆栈:', error.stack || '无堆栈信息');
-            console.error('批次详细信息:', {
-                batchId: batch.batchId,
-                taskCount: batch.tasks.length,
-                tasks: batch.tasks.map(task => ({
-                    rowIndex: task.rowIndex,
-                    text: task.text ?  task.text : null,
-                    textType: typeof task.text
-                }))
-            });
-            
-            this.logCallback(`批次翻译失败: ${error.message || error}`, 'error');
-            // 标记翻译失败
-            batch.success = false;
+            console.error('翻译批次失败:', error);
+            this.logCallback(`翻译失败: ${error.message}`, 'error');
             return false;
         }
     }
-    
+
     /**
-     * 处理批次
-     * @param {Array} batches - 批次数组
+     * 翻译单个任务
+     * @param {Object} task - 翻译任务
      * @param {string} sourceLanguage - 源语言
-     * @param {Function} updateProgressCallback - 更新进度回调
-     * @param {Function} [updateCellCallback] - 更新单元格回调
-     * @returns {Promise<void>}
+     * @returns {Promise<boolean>} - 是否成功
      */
-    async processBatches(
-        batches, 
-        sourceLanguage,
-        updateProgressCallback,
-        updateCellCallback
-    ) {
-        const totalBatches = batches.length;
-        let completedBatches = 0;
-        
-        this.logCallback(`开始处理 ${totalBatches} 个翻译批次`, 'info');
-        
-        for (let i = 0; i < batches.length; i++) {
-            if (this.shouldStopTranslation) {
-                this.logCallback('翻译已被用户停止', 'warning');
-                break;
+    async translateSingle(task, sourceLanguage) {
+        try {
+            console.log(`开始单个翻译 - 源语言: ${sourceLanguage}, 目标语言: ${task.targetLang}, 文本: ${task.text}`);
+            
+            // 获取翻译记忆
+            const tmList = await this.getTranslationMemory(task.text, sourceLanguage, task.targetLang);
+            
+            // 构建API请求体
+            const requestBody = {
+                model: "qwen-mt-turbo",
+                messages: [
+                    {
+                        role: "user",
+                        content: task.text
+                    }
+                ],
+                translation_options: {
+                    source_lang: sourceLanguage,
+                    target_lang: task.targetLang
+                },
+                temperature: 0.7,
+                max_tokens: 1000
+            };
+            
+            // 如果有翻译记忆，添加到请求中
+            if (tmList && tmList.length > 0) {
+                requestBody.translation_options.tm_list = tmList;
+                console.log(`使用 ${tmList.length} 条翻译记忆`);
             }
             
-            const batch = batches[i];
-            const currentBatchId = i + 1;
-            
-            // 更新进度
-            updateProgressCallback({
-                completedBatches,
-                totalBatches,
-                currentBatchId,
-                completedTasksInCurrentBatch: 0,
-                totalTasksInCurrentBatch: batch.tasks.length
+            // 发送API请求
+            const response = await fetch(this.apiEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${typeof this.apiKey === 'string' ? this.apiKey.trim() : this.apiKey}`,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
             });
             
-            try {
-                const success = await this.translateBatch(batch, sourceLanguage);
-                completedBatches++;
-                
-                // 更新进度
-                updateProgressCallback({
-                    completedBatches,
-                    totalBatches,
-                    currentBatchId: 0, // 当前批次已完成
-                    completedTasksInCurrentBatch: batch.tasks.length,
-                    totalTasksInCurrentBatch: batch.tasks.length
-                });
-                
-                // 只有翻译成功时才更新单元格
-                if (success && updateCellCallback) {
-                    updateCellCallback(batch);
-                }
-                
-                this.logCallback(`批次 ${currentBatchId}/${totalBatches} 完成`, 'success');
-            } catch (error) {
-                this.logCallback(`批次 ${currentBatchId}/${totalBatches} 失败`, 'error');
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`单个翻译API错误 - 状态码: ${response.status}, 错误信息:`, errorText);
+                this.logCallback(`翻译API错误: ${response.status} - ${errorText}`, 'error');
+                throw new Error(`翻译API错误: ${response.status}`);
             }
+            
+            const data = await response.json();
+            
+            if (!data.choices?.[0]?.message?.content) {
+                console.error('翻译返回数据格式错误:', data);
+                this.logCallback('翻译返回数据格式错误', 'error');
+                throw new Error('翻译返回数据格式错误');
+            }
+            
+            // 获取翻译结果
+            const translatedContent = data.choices[0].message.content;
+            task.text = typeof translatedContent === 'string' ? 
+                translatedContent.trim() : String(translatedContent);
+            
+            console.log(`单个翻译成功 - 行号: ${task.rowIndex + 1}, 译文: ${task.text}`);
+            return true;
+            
+        } catch (error) {
+            console.error('单个翻译失败:', error);
+            this.logCallback(`翻译失败: ${error.message}`, 'error');
+            return false;
         }
-        
-        this.logCallback(`翻译任务完成: ${completedBatches}/${totalBatches} 个批次`, 
-            completedBatches === totalBatches ? 'success' : 'warning');
     }
 }
+
+// 导出翻译服务实例
+export const translationService = new TranslationService();

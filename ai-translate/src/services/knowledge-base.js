@@ -1,5 +1,5 @@
 import { databaseService as dbService } from './database.js';
-import { embeddingService } from './embedding.js';
+import { embeddingService } from './embedding-instance.js';
 
 export class KnowledgeBaseService {
     /**

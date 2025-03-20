@@ -1,12 +1,12 @@
 import express from 'express';
 import cors from 'cors';
-import bodyParser from 'body-parser';
-import path from 'path';
 import { fileURLToPath } from 'url';
+import path from 'path';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import { initializeDatabase } from './config/database.js';
 import { router as apiRouter, setVectorServiceStatus } from './routes/index.js';
-import { embeddingService } from './services/embedding.js';
+import { embeddingService } from './services/embedding-instance.js';
 
 // 获取当前文件的目录路径
 const __filename = fileURLToPath(import.meta.url);
@@ -25,7 +25,7 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
 }));
-app.use(bodyParser.json());
+app.use(express.json());
 
 // 静态文件服务
 // 确保可以访问到src目录下的所有静态资源

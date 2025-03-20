@@ -10,10 +10,15 @@ import { readExcelFile, createExcelWorkbook } from './utils/excel.js';
  * Excel翻译器类
  */
 export class ExcelTranslator {
+    // 静态属性，用于跟踪事件监听器是否已初始化
+    static _eventsInitialized = false;
+    
     /**
      * 创建Excel翻译器实例
      */
     constructor() {
+        console.log('ExcelTranslator 构造函数被调用');
+        
         // 初始化UI元素
         this.tableOutput = document.getElementById('tableOutput');
         this.logOutput = document.getElementById('logOutput');
@@ -54,9 +59,13 @@ export class ExcelTranslator {
         // 绑定停止按钮事件
         const stopBtn = document.getElementById('stopTranslateBtn');
         if (stopBtn) {
-            stopBtn.addEventListener('click', () => {
+            // 移除可能存在的旧事件监听器
+            const newStopBtn = stopBtn.cloneNode(true);
+            stopBtn.parentNode.replaceChild(newStopBtn, stopBtn);
+            
+            newStopBtn.addEventListener('click', () => {
                 this.shouldStopTranslation = true;
-                stopBtn.disabled = true;
+                newStopBtn.disabled = true;
                 this.logger.log('正在停止翻译...', 'warning');
             });
         }
@@ -66,6 +75,14 @@ export class ExcelTranslator {
      * 初始化事件监听器
      */
     initializeEventListeners() {
+        console.log('initializeEventListeners 被调用', new Error().stack);
+        
+        // 防止重复注册事件监听器 - 使用静态属性
+        if (ExcelTranslator._eventsInitialized) {
+            console.log('事件监听器已初始化，跳过重复注册');
+            return;
+        }
+        
         const fileInput = document.getElementById('fileInput');
         const uploadBtn = document.getElementById('uploadBtn');
         const translateBtn = document.getElementById('translateBtn');
@@ -73,15 +90,26 @@ export class ExcelTranslator {
         const actionButtons = document.getElementById('actionButtons');
         this.sourceLangSelect = document.getElementById('sourceLang');
 
+        console.log('找到的UI元素:', { 
+            fileInput: !!fileInput, 
+            uploadBtn: !!uploadBtn, 
+            translateBtn: !!translateBtn, 
+            exportBtn: !!exportBtn 
+        });
+
         // 处理文件选择按钮点击
         if (uploadBtn) {
+            console.log('为uploadBtn添加点击事件监听器');
             uploadBtn.addEventListener('click', () => {
+                console.log('uploadBtn被点击');
                 fileInput?.click();
             });
         }
 
         if (fileInput) {
+            console.log('为fileInput添加change事件监听器');
             fileInput.addEventListener('change', (e) => {
+                console.log('fileInput change事件触发');
                 this.handleFileSelect(e);
                 if (actionButtons) {
                     actionButtons.style.display = 'block';
@@ -89,8 +117,25 @@ export class ExcelTranslator {
             });
         }
         
-        if (translateBtn) translateBtn.addEventListener('click', () => this.handleTranslateClick());
-        if (exportBtn) exportBtn.addEventListener('click', () => this.exportToExcel());
+        if (translateBtn) {
+            console.log('为translateBtn添加点击事件监听器');
+            translateBtn.addEventListener('click', () => {
+                console.log('translateBtn被点击');
+                this.handleTranslateClick();
+            });
+        }
+        
+        if (exportBtn) {
+            console.log('为exportBtn添加点击事件监听器');
+            exportBtn.addEventListener('click', () => {
+                console.log('exportBtn被点击');
+                this.exportToExcel();
+            });
+        }
+        
+        // 标记事件监听器已初始化
+        ExcelTranslator._eventsInitialized = true;
+        console.log('事件监听器初始化完成');
     }
 
     /**
@@ -337,10 +382,14 @@ export class ExcelTranslator {
             
             // 设置停止按钮事件
             if (stopBtn) {
-                stopBtn.onclick = () => {
+                // 移除可能存在的旧事件监听器
+                const newStopBtn = stopBtn.cloneNode(true);
+                stopBtn.parentNode.replaceChild(newStopBtn, stopBtn);
+                
+                newStopBtn.onclick = () => {
                     this.shouldStopTranslation = true;
                     translationManager.stopTranslation();
-                    stopBtn.disabled = true;
+                    newStopBtn.disabled = true;
                     this.logger.log('正在停止翻译...', 'warning');
                 };
             }
