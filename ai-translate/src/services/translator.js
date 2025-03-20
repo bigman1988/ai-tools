@@ -10,7 +10,7 @@ export class TranslationService {
     constructor(apiKey, logCallback) {
         this.apiEndpoint = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
         // 优先使用传入的API密钥，如果没有则使用环境变量中的密钥
-        this.apiKey = apiKey || process.env.DEEPSEEK_API_KEY || '';
+        this.apiKey = apiKey || process.env.ALI_API_KEY || '';
         this.logCallback = logCallback || console.log;
         this.shouldStopTranslation = false;
         
@@ -59,8 +59,8 @@ export class TranslationService {
             
             // 再次尝试从环境变量获取API密钥
             if (!this.apiKey || (typeof this.apiKey === 'string' && this.apiKey.trim() === '')) {
-                if (process.env.DEEPSEEK_API_KEY) {
-                    this.apiKey = process.env.DEEPSEEK_API_KEY;
+                if (process.env.ALI_API_KEY) {
+                    this.apiKey = process.env.ALI_API_KEY;
                     console.log('从环境变量获取到API密钥');
                 } else {
                     const error = new Error('错误：API密钥未设置');
