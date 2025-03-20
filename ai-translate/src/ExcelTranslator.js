@@ -145,11 +145,11 @@ export class ExcelTranslator {
         // 遍历所有列标题，尝试匹配语言
         for (let i = 0; i < headerRow.length; i++) {
             const columnHeader = headerRow[i];
-            const language = LanguageUtils.guessLanguageFromColumnHeader(columnHeader);
+            const language = LanguageUtils.findLanguageByColumnHeader(columnHeader);
             
-            if (language && language.langCode === 'zh') {
+            if (language === 'Chinese') {
                 // 如果找到中文列，设置为源语言
-                this.sourceLangSelect.value = language.langCode;
+                this.sourceLangSelect.value = 'Chinese';
                 this.logger.log(`已自动检测到源语言列: ${columnHeader} (列 ${this.getExcelColumnName(i)})`, 'info');
                 break;
             }
@@ -261,7 +261,7 @@ export class ExcelTranslator {
         }
         
         // 获取源语言
-        const sourceLang = this.sourceLangSelect?.value || 'zh';
+        const sourceLang = this.sourceLangSelect?.value || 'Chinese';
         const sourceApiCode = LanguageUtils.getApiLanguageCode(sourceLang);
         
         // 查找源语言列
@@ -280,9 +280,10 @@ export class ExcelTranslator {
         // 查找源语言列
         for (let i = 0; i < headerRow.length; i++) {
             const columnHeader = headerRow[i];
-            const language = LanguageUtils.guessLanguageFromColumnHeader(columnHeader);
+            const language = LanguageUtils.findLanguageByColumnHeader(columnHeader);
+            const sourceLanguageConfig = LanguageUtils.getSourceLanguageConfig();
             
-            if (language && language.langCode === sourceLang) {
+            if (language === sourceLanguageConfig[LanguageUtils.getLanguageDisplayName(sourceLang)]) {
                 sourceColumnIndex = i;
                 break;
             }
@@ -298,17 +299,19 @@ export class ExcelTranslator {
         
         // 查找所有目标语言列
         const targetColumns = [];
+        const sourceLanguageConfig = LanguageUtils.getSourceLanguageConfig();
+        
         for (let i = 0; i < headerRow.length; i++) {
             if (i === sourceColumnIndex) continue;
             
             const columnHeader = headerRow[i];
-            const language = LanguageUtils.guessLanguageFromColumnHeader(columnHeader);
+            const language = LanguageUtils.findLanguageByColumnHeader(columnHeader);
             
-            if (language && language.langCode !== sourceLang) {
+            if (language && language !== sourceLanguageConfig[LanguageUtils.getLanguageDisplayName(sourceLang)]) {
                 targetColumns.push({
                     index: i,
-                    langCode: language.langCode,
-                    display: language.name
+                    langCode: language,
+                    display: columnHeader
                 });
             }
         }

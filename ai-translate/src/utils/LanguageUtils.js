@@ -3,37 +3,42 @@
  */
 export class LanguageUtils {
     /**
-     * 获取语言映射
-     * @returns {Object} - 语言映射对象
+     * 获取源语言列表
+     * @returns {Array} - 源语言列表
      */
-    static getLanguageMappings() {
+    static getSourceLanguages() {
+        return ['Chinese', 'English'];
+    }
+
+    /**
+     * 获取源语言配置
+     * @returns {Object} - 源语言配置对象
+     */
+    static getSourceLanguageConfig() {
         return {
-            'zh': { name: '简体中文', apiCode: 'zh-CN', columnHeaders: ['简体中文', '中文'] },
-            'en': { name: '英语', apiCode: 'en-US', columnHeaders: ['英语', '英文', 'English'] },
-            'ja': { name: '日语', apiCode: 'ja-JP', columnHeaders: ['日语', '日文', 'Japanese'] },
-            'ko': { name: '韩语', apiCode: 'ko-KR', columnHeaders: ['韩语', '韩文', 'Korean'] },
-            'es': { name: '西班牙语', apiCode: 'es-ES', columnHeaders: ['西班牙语', 'Spanish'] },
-            'fr': { name: '法语', apiCode: 'fr-FR', columnHeaders: ['法语', '法文', 'French'] },
-            'de': { name: '德语', apiCode: 'de-DE', columnHeaders: ['德语', '德文', 'German'] },
-            'ru': { name: '俄语', apiCode: 'ru-RU', columnHeaders: ['俄语', '俄文', 'Russian'] },
-            'th': { name: '泰语', apiCode: 'th-TH', columnHeaders: ['泰语', '泰文', 'Thai'] },
-            'it': { name: '意大利语', apiCode: 'it-IT', columnHeaders: ['意大利语', 'Italian'] },
-            'id': { name: '印尼语', apiCode: 'id-ID', columnHeaders: ['印尼语', '印度尼西亚语', 'Indonesian'] },
-            'pt': { name: '葡萄牙语', apiCode: 'pt-PT', columnHeaders: ['葡萄牙语', 'Portuguese'] }
+            'Chinese': 'Chinese',
+            'English': 'English'
         };
     }
 
     /**
-     * 获取语言选项
-     * @returns {Array} - 语言选项数组
+     * 获取语言映射
+     * @returns {Array} - 语言映射数组
      */
-    static getLanguageOptions() {
-        const mappings = this.getLanguageMappings();
-        return Object.entries(mappings).map(([code, info]) => ({
-            code,
-            name: info.name,
-            apiCode: info.apiCode
-        }));
+    static getLanguageMappings() {
+        return [
+            { columnHeader: '英语', targetLang: 'English' },
+            { columnHeader: '日语', targetLang: 'Japanese' },
+            { columnHeader: '韩语', targetLang: 'Korean' },
+            { columnHeader: '西班牙语', targetLang: 'Spanish' },
+            { columnHeader: '法语', targetLang: 'French' },
+            { columnHeader: '德语', targetLang: 'German' },
+            { columnHeader: '俄语', targetLang: 'Russian' },
+            { columnHeader: '泰语', targetLang: 'Thai' },
+            { columnHeader: '意大利语', targetLang: 'Italian' },
+            { columnHeader: '印尼语', targetLang: 'Indonesian' },
+            { columnHeader: '葡萄牙语', targetLang: 'Portuguese' }
+        ];
     }
 
     /**
@@ -42,8 +47,8 @@ export class LanguageUtils {
      * @returns {string} - 语言显示名称
      */
     static getLanguageDisplayName(langCode) {
-        const mappings = this.getLanguageMappings();
-        return mappings[langCode]?.name || langCode;
+        // 简单返回语言代码，因为我们不再使用详细的映射
+        return langCode;
     }
 
     /**
@@ -52,36 +57,28 @@ export class LanguageUtils {
      * @returns {string} - API语言代码
      */
     static getApiLanguageCode(langCode) {
-        const mappings = this.getLanguageMappings();
-        return mappings[langCode]?.apiCode || langCode;
+        // 直接返回英文全拼的语言代码
+        return langCode;
     }
 
     /**
-     * 根据列标题猜测语言
+     * 根据列标题查找语言
      * @param {string} columnHeader - 列标题
-     * @returns {Object|null} - 语言信息或null
+     * @returns {string|null} - 语言代码或null
      */
-    static guessLanguageFromColumnHeader(columnHeader) {
+    static findLanguageByColumnHeader(columnHeader) {
         if (!columnHeader) return null;
         
         const mappings = this.getLanguageMappings();
-        
-        // 转换为小写进行比较
-        const normalizedHeader = columnHeader.trim().toLowerCase();
-        
-        for (const [langCode, info] of Object.entries(mappings)) {
-            // 检查列标题是否匹配任何已知语言的列标题
-            const matchesHeader = info.columnHeaders.some(header => 
-                normalizedHeader === header.toLowerCase()
-            );
-            
-            if (matchesHeader) {
-                return {
-                    langCode,
-                    apiCode: info.apiCode,
-                    name: info.name
-                };
+        for (const mapping of mappings) {
+            if (mapping.columnHeader === columnHeader) {
+                return mapping.targetLang;
             }
+        }
+        
+        // 特殊处理源语言
+        if (columnHeader === '简体中文' || columnHeader === '中文') {
+            return 'Chinese';
         }
         
         return null;
