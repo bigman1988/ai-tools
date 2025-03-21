@@ -6,7 +6,7 @@ export class ApiService {
      * 构造函数
      */
     constructor() {
-        this.baseUrl = 'http://localhost:3000/api';
+        this.baseUrl = 'http://0.0.0.0:3000/api';
         this.debug = true; // 启用调试模式
         console.log('ApiService: 初始化，baseUrl =', this.baseUrl);
     }
