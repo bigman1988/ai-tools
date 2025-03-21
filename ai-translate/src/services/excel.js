@@ -165,83 +165,158 @@ class ExcelService {
                         // 只有在数据发生变化时才需要更新向量
                         needVectorUpdate = dataChanged;
                         
-                        // 如果有字段需要更新
+                        // 如果有字段需要更新并且向量服务可用，先处理向量
                         if (updateFields.length > 0) {
-                            // 添加WHERE条件参数
-                            updateParams.push(entry.Chinese);
-                            
-                            // 执行更新
-                            const updateSql = `UPDATE \`translate\` SET ${updateFields.join(', ')} WHERE Chinese = ?`;
-                            await connection.query(updateSql, updateParams);
-                            
-                            result.updated++;
-                            console.log(`更新条目: "${entry.Chinese}"`);
+                            // 如果向量服务可用且需要更新向量，先处理向量再更新数据库
+                            if (vectorServiceAvailable && needVectorUpdate) {
+                                try {
+                                    // 如果是更新且已有向量ID，先删除旧向量
+                                    if (existingEntry && existingEntry.vector_id) {
+                                        try {
+                                            await embeddingService.deleteEmbedding(existingEntry.vector_id);
+                                            console.log(`删除旧向量: ${existingEntry.vector_id}`);
+                                        } catch (vectorDeleteError) {
+                                            console.warn(`删除旧向量失败: ${existingEntry.vector_id}`, vectorDeleteError);
+                                            // 如果删除旧向量失败，记录错误但继续处理
+                                        }
+                                    }
+                                    
+                                    // 生成新的向量嵌入
+                                    const vectorResult = await embeddingService.storeEntryVectors(entry);
+                                    
+                                    if (vectorResult && vectorResult.success) {
+                                        // 向量处理成功，现在更新数据库
+                                        // 添加WHERE条件参数
+                                        updateParams.push(entry.Chinese);
+                                        
+                                        // 执行更新
+                                        const updateSql = `UPDATE \`translate\` SET ${updateFields.join(', ')} WHERE Chinese = ?`;
+                                        await connection.query(updateSql, updateParams);
+                                        
+                                        // 更新数据库中的向量ID
+                                        await connection.query(
+                                            'UPDATE `translate` SET vector_id = ? WHERE Chinese = ?',
+                                            [vectorResult.id, entry.Chinese]
+                                        );
+                                        
+                                        result.updated++;
+                                        result.vectorsCreated++;
+                                        console.log(`更新条目: "${entry.Chinese}"`);
+                                        console.log(`创建向量: ${vectorResult.id} 用于条目 "${entry.Chinese}"`);
+                                    } else {
+                                        // 向量处理失败，跳过数据库更新
+                                        result.skipped++;
+                                        result.errors.push({
+                                            entry: entry.Chinese,
+                                            error: '向量处理失败，跳过数据库更新'
+                                        });
+                                        console.log(`跳过条目(向量处理失败): "${entry.Chinese}"`);
+                                    }
+                                } catch (vectorError) {
+                                    console.error(`生成向量嵌入失败: "${entry.Chinese}"`, vectorError);
+                                    // 向量处理失败，跳过数据库更新
+                                    result.skipped++;
+                                    result.errors.push({
+                                        entry: entry.Chinese,
+                                        error: `向量处理失败: ${vectorError.message}`
+                                    });
+                                    console.log(`跳过条目(向量处理异常): "${entry.Chinese}"`);
+                                }
+                            } else {
+                                // 向量服务不可用或不需要更新向量，直接更新数据库
+                                // 添加WHERE条件参数
+                                updateParams.push(entry.Chinese);
+                                
+                                // 执行更新
+                                const updateSql = `UPDATE \`translate\` SET ${updateFields.join(', ')} WHERE Chinese = ?`;
+                                await connection.query(updateSql, updateParams);
+                                
+                                result.updated++;
+                                console.log(`更新条目: "${entry.Chinese}"`);
+                            }
                         } else {
                             // 没有字段需要更新，跳过
                             result.skipped++;
                             console.log(`跳过条目(无需更新): "${entry.Chinese}"`);
-                            continue; // 跳过向量处理
                         }
                     } else {
                         // 新条目，需要插入
                         needVectorUpdate = true;
                         
-                        // 插入新条目
-                        await connection.query(
-                            'INSERT INTO `translate` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                            [
-                                entry.Chinese || '',
-                                entry.English || '',
-                                entry.Japanese || '',
-                                entry.Korean || '',
-                                entry.Spanish || '',
-                                entry.French || '',
-                                entry.German || '',
-                                entry.Russian || '',
-                                entry.Thai || '',
-                                entry.Italian || '',
-                                entry.Indonesian || '',
-                                entry.Portuguese || ''
-                            ]
-                        );
-                        
-                        result.inserted++;
-                        console.log(`插入条目: "${entry.Chinese}"`);
-                    }
-                    
-                    // 如果向量服务可用且需要更新向量
-                    if (vectorServiceAvailable && needVectorUpdate) {
-                        try {
-                            // 如果是更新且已有向量ID，先删除旧向量
-                            if (existingEntry && existingEntry.vector_id) {
-                                try {
-                                    await embeddingService.deleteEmbedding(existingEntry.vector_id);
-                                    console.log(`删除旧向量: ${existingEntry.vector_id}`);
-                                } catch (vectorDeleteError) {
-                                    console.warn(`删除旧向量失败: ${existingEntry.vector_id}`, vectorDeleteError);
-                                }
-                            }
-                            
-                            // 生成新的向量嵌入
-                            const vectorResult = await embeddingService.storeEntryVectors(entry);
-                            
-                            if (vectorResult && vectorResult.success) {
-                                // 更新数据库中的向量ID
-                                await connection.query(
-                                    'UPDATE `translate` SET vector_id = ? WHERE Chinese = ?',
-                                    [vectorResult.id, entry.Chinese]
-                                );
+                        // 如果向量服务可用，先处理向量再插入数据库
+                        if (vectorServiceAvailable) {
+                            try {
+                                // 生成新的向量嵌入
+                                const vectorResult = await embeddingService.storeEntryVectors(entry);
                                 
-                                result.vectorsCreated++;
-                                console.log(`创建向量: ${vectorResult.id} 用于条目 "${entry.Chinese}"`);
+                                if (vectorResult && vectorResult.success) {
+                                    // 向量处理成功，现在插入数据库
+                                    // 插入新条目
+                                    await connection.query(
+                                        'INSERT INTO `translate` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese, vector_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                                        [
+                                            entry.Chinese || '',
+                                            entry.English || '',
+                                            entry.Japanese || '',
+                                            entry.Korean || '',
+                                            entry.Spanish || '',
+                                            entry.French || '',
+                                            entry.German || '',
+                                            entry.Russian || '',
+                                            entry.Thai || '',
+                                            entry.Italian || '',
+                                            entry.Indonesian || '',
+                                            entry.Portuguese || '',
+                                            vectorResult.id
+                                        ]
+                                    );
+                                    
+                                    result.inserted++;
+                                    result.vectorsCreated++;
+                                    console.log(`插入条目: "${entry.Chinese}"`);
+                                    console.log(`创建向量: ${vectorResult.id} 用于条目 "${entry.Chinese}"`);
+                                } else {
+                                    // 向量处理失败，跳过数据库插入
+                                    result.skipped++;
+                                    result.errors.push({
+                                        entry: entry.Chinese,
+                                        error: '向量处理失败，跳过数据库插入'
+                                    });
+                                    console.log(`跳过条目(向量处理失败): "${entry.Chinese}"`);
+                                }
+                            } catch (vectorError) {
+                                console.error(`生成向量嵌入失败: "${entry.Chinese}"`, vectorError);
+                                // 向量处理失败，跳过数据库插入
+                                result.skipped++;
+                                result.errors.push({
+                                    entry: entry.Chinese,
+                                    error: `向量处理失败: ${vectorError.message}`
+                                });
+                                console.log(`跳过条目(向量处理异常): "${entry.Chinese}"`);
                             }
-                        } catch (vectorError) {
-                            console.error(`生成向量嵌入失败: "${entry.Chinese}"`, vectorError);
-                            // 继续处理，但记录错误
-                            result.errors.push({
-                                entry: entry.Chinese,
-                                error: `向量处理失败: ${vectorError.message}`
-                            });
+                        } else {
+                            // 向量服务不可用，直接插入数据库
+                            // 插入新条目
+                            await connection.query(
+                                'INSERT INTO `translate` (Chinese, English, Japanese, Korean, Spanish, French, German, Russian, Thai, Italian, Indonesian, Portuguese) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                                [
+                                    entry.Chinese || '',
+                                    entry.English || '',
+                                    entry.Japanese || '',
+                                    entry.Korean || '',
+                                    entry.Spanish || '',
+                                    entry.French || '',
+                                    entry.German || '',
+                                    entry.Russian || '',
+                                    entry.Thai || '',
+                                    entry.Italian || '',
+                                    entry.Indonesian || '',
+                                    entry.Portuguese || ''
+                                ]
+                            );
+                            
+                            result.inserted++;
+                            console.log(`插入条目: "${entry.Chinese}"`);
                         }
                     }
                 } catch (entryError) {

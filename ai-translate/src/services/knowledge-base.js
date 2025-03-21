@@ -192,7 +192,7 @@ export class KnowledgeBaseService {
      * @param {number} limit - 限制结果数量
      * @returns {Promise<Array>} - 搜索结果
      */
-    async vectorSearch(text, type = 'chinese', limit = 5) {
+    async vectorSearch(text, type = 'chinese', limit = 3) {
         if (!this.vectorServiceAvailable) {
             throw new Error('向量搜索服务不可用');
         }
@@ -207,7 +207,7 @@ export class KnowledgeBaseService {
      * @param {number} limit - 限制结果数量
      * @returns {Promise<Array>} - 搜索结果
      */
-    async advancedVectorSearch(text, type = 'chinese', limit = 5) {
+    async advancedVectorSearch(text, type = 'chinese', limit = 3) {
         if (!this.vectorServiceAvailable) {
             throw new Error('向量搜索服务不可用');
         }

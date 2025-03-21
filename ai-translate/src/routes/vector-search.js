@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
             return res.status(503).json({ error: '向量搜索服务不可用' });
         }
         
-        const { query, limit = 5 } = req.query;
+        const { query, limit = 3 } = req.query;
         
         if (!query) {
             return res.status(400).json({ error: '搜索查询不能为空' });
@@ -40,7 +40,7 @@ router.get('/advanced', async (req, res) => {
             return res.status(503).json({ error: '向量搜索服务不可用' });
         }
         
-        const { query, type = 'chinese', limit = 5 } = req.query;
+        const { query, type = 'chinese', limit = 3 } = req.query;
         
         if (!query) {
             return res.status(400).json({ error: '搜索查询不能为空' });

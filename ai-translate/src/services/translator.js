@@ -59,7 +59,7 @@ export class TranslationService {
             
             try {
                 // 搜索相似的翻译条目
-                const similarEntries = await embeddingService.searchSimilar(text, vectorLanguage, 5);
+                const similarEntries = await embeddingService.searchSimilar(text, vectorLanguage, 3);
                 
                 // 如果没有找到相似条目，返回空数组
                 if (!similarEntries || similarEntries.length === 0) {
@@ -413,7 +413,7 @@ export class TranslationService {
             
             // 如果有翻译记忆，添加到请求中
             if (tmList && tmList.length > 0) {
-                requestBody.translation_options.tm_list = tmList;
+                requestBody.translation_options.tmList = tmList;
                 console.log(`使用 ${tmList.length} 条翻译记忆`);
             }
             

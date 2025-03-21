@@ -4,7 +4,7 @@ import fetch from 'node-fetch';
 export class VectorStoreService {
     constructor() {
         this.collectionName = 'translation_kb';
-        this.vectorSize = 768; 
+        this.vectorSize = 1024; 
         this.client = new QdrantClient({
             url: process.env.QDRANT_URL || 'http://localhost:6333',
         });

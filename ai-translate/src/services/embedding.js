@@ -12,7 +12,7 @@ export class OllamaEmbeddingService {
         modelName = 'bge-m3:latest',
         qdrantUrl = process.env.QDRANT_URL || 'http://172.16.0.78:6333',
         collectionName = 'translation_embeddings',
-        vectorSize = 768
+        vectorSize = 1024
     ) {
         // 如果已经有实例，直接返回
         if (instance) {
@@ -537,10 +537,9 @@ export class OllamaEmbeddingService {
                 
                 // 执行向量搜索
                 searchResults = await this.qdrantClient.search(this.collectionName, {
-                    vector: embedding.embedding,
+                    vector: {name:vectorName, vector:embedding.embedding},
                     limit:limit,
                     with_payload: true,  // 确保返回完整的payload
-                    vector_name: vectorName  // 根据源语言选择向量字段
                 });
                 
                 console.log(`搜索完成，找到 ${searchResults?.length || 0} 个结果`);
@@ -562,6 +561,9 @@ export class OllamaEmbeddingService {
                         console.error('创建集合失败:', initError.message);
                     }
                 }
+                else {
+                    console.error('Qdrant搜索失败:', qdrantError.data.status.error);
+                }
                 return [];
             }
             
@@ -577,11 +579,11 @@ export class OllamaEmbeddingService {
                 
                 // 计算相似度
                 let similarity = result.score;
-                if (language === 'english' && payload.vector_en) {
-                    similarity = this.calculateCosineSimilarity(embedding.embedding, payload.vector_en);
-                } else if (language === 'chinese' && payload.vector_cn) {
-                    similarity = this.calculateCosineSimilarity(embedding.embedding, payload.vector_cn);
-                }
+                // if (language === 'english' && payload.vector_en) {
+                //     similarity = this.calculateCosineSimilarity(embedding.embedding, payload.vector_en);
+                // } else if (language === 'chinese' && payload.vector_cn) {
+                //     similarity = this.calculateCosineSimilarity(embedding.embedding, payload.vector_cn);
+                // }
                 
                 // 返回处理后的结果
                 return {
