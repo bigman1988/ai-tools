@@ -57,8 +57,25 @@ export class LanguageUtils {
      * @returns {string} - API语言代码
      */
     static getApiLanguageCode(langCode) {
-        // 直接返回英文全拼的语言代码
-        return langCode;
+        // 将简写语言代码转换为API需要的全拼语言名称
+        if (!langCode) return '';
+        
+        const languageCodeMap = {
+            'zh': 'Chinese',
+            'en': 'English',
+            'ja': 'Japanese',
+            'ko': 'Korean',
+            'es': 'Spanish',
+            'fr': 'French',
+            'de': 'German',
+            'ru': 'Russian',
+            'th': 'Thai',
+            'it': 'Italian',
+            'id': 'Indonesian',
+            'pt': 'Portuguese'
+        };
+        
+        return languageCodeMap[langCode] || langCode;
     }
 
     /**
