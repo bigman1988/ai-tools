@@ -1,6 +1,22 @@
 {
   "version": "0.2.0",
   "configurations": [
+  {
+    "name": "Test",
+    "program": "${workspaceFolder}/ai-translate/test-embedding-generation.js",
+    "request": "launch",
+    "skipFiles": [
+      "<node_internals>/**"
+    ],
+    "console": "integratedTerminal",
+    "internalConsoleOptions": "neverOpen",
+    "cwd": "${workspaceFolder}/ai-translate",
+    "env": {
+      "NODE_ENV": "development"
+    },
+    "runtimeArgs": ["--experimental-modules"],
+    "type": "node"
+  },
     {
       "type": "node",
       "request": "launch",

@@ -9,7 +9,7 @@ let instance = null;
 export class OllamaEmbeddingService {
     constructor(
         ollamaUrl = process.env.OLLAMA_URL || 'http://172.16.1.65:11434',
-        modelName = 'nomic-embed-text',
+        modelName = 'bge-m3:latest',
         qdrantUrl = process.env.QDRANT_URL || 'http://172.16.0.78:6333',
         collectionName = 'translation_embeddings',
         vectorSize = 768
@@ -128,7 +128,7 @@ export class OllamaEmbeddingService {
             const response = await fetch(`${this.ollamaUrl}/api/embeddings`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json; charset=UTF-8'
                 },
                 body: JSON.stringify(requestBody)
             });
@@ -140,7 +140,7 @@ export class OllamaEmbeddingService {
             }
             
             const responseText = await response.text();
-            console.log('嵌入API原始响应:', responseText);
+            //console.log('嵌入API原始响应:', responseText);
             
             const data = JSON.parse(responseText);
             console.log(`嵌入响应数据 - 向量长度: ${data.embedding ? data.embedding.length : 'undefined'}`);
@@ -221,18 +221,18 @@ export class OllamaEmbeddingService {
             
             // 准备元数据
             const payload = {
-                chinese: entry.Chinese || '',
-                english: entry.English || '',
-                japanese: entry.Japanese || '',
-                korean: entry.Korean || '',
-                spanish: entry.Spanish || '',
-                french: entry.French || '',
-                german: entry.German || '',
-                russian: entry.Russian || '',
-                thai: entry.Thai || '',
-                italian: entry.Italian || '',
-                indonesian: entry.Indonesian || '',
-                portuguese: entry.Portuguese || ''
+                Chinese: entry.Chinese || '',
+                English: entry.English || '',
+                Japanese: entry.Japanese || '',
+                Korean: entry.Korean || '',
+                Spanish: entry.Spanish || '',
+                French: entry.French || '',
+                German: entry.German || '',
+                Russian: entry.Russian || '',
+                Thai: entry.Thai || '',
+                Italian: entry.Italian || '',
+                Indonesian: entry.Indonesian || '',
+                Portuguese: entry.Portuguese || ''
             };
             
             // 生成中文和英文的向量嵌入
@@ -489,11 +489,11 @@ export class OllamaEmbeddingService {
     /**
      * 搜索相似文本
      * @param {string} text - 要搜索的文本
-     * @param {number} limit - 返回结果数量限制
      * @param {string} language - 语言类型，'chinese'或'english'
+     * @param {number} limit - 返回结果数量限制
      * @returns {Promise<Array>} - 搜索结果数组
      */
-    async searchSimilar(text, limit = 5, language = 'chinese') {
+    async searchSimilar(text, language = 'chinese', limit = 3) {
         try {
             if (!text || typeof text !== 'string' || text.trim() === '') {
                 console.error('搜索文本为空');
@@ -501,6 +501,7 @@ export class OllamaEmbeddingService {
             }
             
             console.log(`搜索相似文本: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`);
+            console.log(`搜索语言: ${language}`);
             
             // 生成文本的嵌入向量
             let embedding;
@@ -528,12 +529,16 @@ export class OllamaEmbeddingService {
                 console.log(`执行向量搜索，集合: ${this.collectionName}, 向量维度: ${embedding.embedding.length}`);
                 
                 // 确定使用哪个向量字段
-                const vectorName = typeof language === 'string' && language.toLowerCase() === 'english' ? 'vector_en' : 'vector_cn';
+                // 标准化语言参数，忽略大小写，只关注是否是英语
+                const isEnglish = typeof language === 'string' && language.toLowerCase().includes('english');
+                const vectorName = isEnglish ? 'vector_en' : 'vector_cn';
+                
+                console.log(`使用向量字段: ${vectorName}, 语言参数: ${language}, 是否英语: ${isEnglish}`);
                 
                 // 执行向量搜索
                 searchResults = await this.qdrantClient.search(this.collectionName, {
                     vector: embedding.embedding,
-                    limit: 50,
+                    limit:limit,
                     with_payload: true,  // 确保返回完整的payload
                     vector_name: vectorName  // 根据源语言选择向量字段
                 });

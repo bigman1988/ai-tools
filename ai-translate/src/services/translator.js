@@ -77,8 +77,36 @@ export class TranslationService {
                 const tmList = [];
                 
                 for (const entry of similarEntries) {
-                    const source = entry.payload[sourceField];
-                    const target = entry.payload[targetField];
+                    // 检查payload是否存在
+                    if (!entry.payload) {
+                        console.log('跳过翻译记忆: payload为空');
+                        continue;
+                    }
+                    
+                    // 输出完整的payload以便调试
+                    console.log('翻译记忆条目payload:', JSON.stringify(entry.payload));
+                    
+                    // 处理字段名大小写问题：同时检查首字母大写和首字母小写的字段
+                    const sourceFieldLower = sourceField.toLowerCase();
+                    const targetFieldLower = targetField.toLowerCase();
+                    
+                    // 尝试获取源语言和目标语言的值（考虑大小写）
+                    let source = entry.payload[sourceField];
+                    let target = entry.payload[targetField];
+                    
+                    // 如果使用首字母大写的字段名没有找到值，尝试使用首字母小写的字段名
+                    if (!source && entry.payload[sourceFieldLower]) {
+                        source = entry.payload[sourceFieldLower];
+                        console.log(`使用小写字段名找到源语言值: ${sourceFieldLower}`);
+                    }
+                    
+                    if (!target && entry.payload[targetFieldLower]) {
+                        target = entry.payload[targetFieldLower];
+                        console.log(`使用小写字段名找到目标语言值: ${targetFieldLower}`);
+                    }
+                    
+                    // 输出源语言和目标语言的值以便调试
+                    console.log(`源语言(${sourceField}/${sourceFieldLower})值: "${source}", 目标语言(${targetField}/${targetFieldLower})值: "${target}"`);
                     
                     // 只有当源和目标都有值时才添加到翻译记忆
                     if (source && target && source.trim() !== '' && target.trim() !== '') {
@@ -89,10 +117,30 @@ export class TranslationService {
                         console.log(`添加翻译记忆: ${source} -> ${target}`);
                     } else {
                         if (!source || source.trim() === '') {
-                            console.log(`跳过翻译记忆: 源语言 ${sourceField} 字段为空`);
+                            console.log(`跳过翻译记忆: 源语言字段为空`);
                         }
                         if (!target || target.trim() === '') {
-                            console.log(`跳过翻译记忆: 目标语言 ${targetField} 字段为空`);
+                            console.log(`跳过翻译记忆: 目标语言字段为空, payload中的字段: ${Object.keys(entry.payload).join(', ')}`);
+                            
+                            // 尝试检查是否有其他可能的目标语言字段
+                            const payloadKeys = Object.keys(entry.payload);
+                            const possibleTargetField = payloadKeys.find(key => 
+                                key.toLowerCase() === targetField.toLowerCase() || 
+                                key.toLowerCase().includes(targetField.toLowerCase())
+                            );
+                            
+                            if (possibleTargetField && possibleTargetField !== targetField && possibleTargetField !== targetFieldLower) {
+                                const possibleTarget = entry.payload[possibleTargetField];
+                                console.log(`找到可能的目标语言字段 ${possibleTargetField}, 值: "${possibleTarget}"`);
+                                
+                                if (possibleTarget && possibleTarget.trim() !== '') {
+                                    tmList.push({
+                                        source: source,
+                                        target: possibleTarget
+                                    });
+                                    console.log(`使用替代字段添加翻译记忆: ${source} -> ${possibleTarget}`);
+                                }
+                            }
                         }
                     }
                 }
