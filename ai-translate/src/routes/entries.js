@@ -38,6 +38,13 @@ router.post('/', async (req, res) => {
                 details: '中文字段不能为空' 
             });
         }
+
+        if(entry.Chinese && entry.Chinese.length > 50){
+            return res.status(400).json({ 
+                error: '添加条目失败', 
+                details: '中文字段过长' 
+            });
+        }
         
         // 使用知识库服务添加条目
         try {

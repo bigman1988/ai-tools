@@ -125,6 +125,25 @@ class ExcelService {
             // 处理所有行数据
             for (const entry of entries) {
                 try {
+                    if(!entry.Chinese || entry.Chinese.trim() === '') {
+                        result.skipped++;
+                        result.errors.push({
+                            entry: entry.Chinese,
+                            error: '中文字段不能为空'
+                        });
+                        console.log(`跳过条目(中文字段为空): "${entry.Chinese}"`);
+                        continue;
+                    }
+
+                    if(entry.Chinese && entry.Chinese.length > 50){
+                        result.skipped++;
+                        result.errors.push({
+                            entry: entry.Chinese,
+                            error: '中文字段过长'
+                        });
+                        console.log(`跳过条目(中文字段过长): "${entry.Chinese}"`);
+                        continue;
+                    }
                     // 检查MySQL中是否已存在该条目
                     const [existingEntries] = await connection.query(
                         'SELECT * FROM `translate` WHERE Chinese = ?',
