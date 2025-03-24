@@ -1,7 +1,7 @@
 {
-  "name": "excel-to-structured-data",
+  "name": "ai-translate",
   "version": "1.0.0",
-  "description": "Excel to Structured Data Converter",
+  "description": "ai translate",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
