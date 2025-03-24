@@ -6,7 +6,8 @@ export class ApiService {
      * 构造函数
      */
     constructor() {
-        this.baseUrl = 'http://0.0.0.0:3000/api';
+        // 使用相对路径，这样可以自动适应不同的部署环境
+        this.baseUrl = '/api';
         this.debug = true; // 启用调试模式
         console.log('ApiService: 初始化，baseUrl =', this.baseUrl);
     }
