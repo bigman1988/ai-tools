@@ -1,11 +1,16 @@
 import fetch, { Headers } from 'node-fetch';
-import { QdrantClient } from '@qdrant/qdrant-js';
+import { QdrantClient } from '@qdrant/js-client-rest';
 import crypto from 'crypto'; // 导入crypto模块
 // 不再使用 dotenv/config，在服务器启动时已加载环境变量
 
-// 如果在Node.js环境中，需要全局提供Headers
-if (typeof global !== 'undefined' && !global.Headers) {
-    global.Headers = Headers;
+// 如果在Node.js环境中，需要全局提供Headers和fetch
+if (typeof global !== 'undefined') {
+    if (!global.Headers) {
+        global.Headers = Headers;
+    }
+    if (!global.fetch) {
+        global.fetch = fetch;
+    }
 }
 
 // 单例实例
