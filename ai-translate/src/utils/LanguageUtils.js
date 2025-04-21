@@ -37,7 +37,9 @@ export class LanguageUtils {
             { columnHeader: '泰语', targetLang: 'Thai' },
             { columnHeader: '意大利语', targetLang: 'Italian' },
             { columnHeader: '印尼语', targetLang: 'Indonesian' },
-            { columnHeader: '葡萄牙语', targetLang: 'Portuguese' }
+            { columnHeader: '葡萄牙语', targetLang: 'Portuguese' },
+            { columnHeader: '越南语', targetLang: 'Vietnamese' }
+
         ];
     }
 

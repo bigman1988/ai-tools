@@ -306,7 +306,8 @@ export class KnowledgeBaseManager {
                 '泰语': 'Thai',
                 '意大利语': 'Italian',
                 '印尼语': 'Indonesian',
-                '葡萄牙语': 'Portuguese'
+                '葡萄牙语': 'Portuguese',
+                '越南语': 'Vietnamese'
             };
             
             // 解析表头索引

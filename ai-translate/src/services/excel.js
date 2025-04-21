@@ -399,7 +399,8 @@ class ExcelService {
                 'Thai': '泰语',
                 'Italian': '意大利语',
                 'Indonesian': '印尼语',
-                'Portuguese': '葡萄牙语'
+                'Portuguese': '葡萄牙语',
+                'Vietnamese': '越南语'
             };
             
             // 准备数据
