@@ -38,8 +38,8 @@ export class LanguageUtils {
             { columnHeader: '意大利语', targetLang: 'Italian' },
             { columnHeader: '印尼语', targetLang: 'Indonesian' },
             { columnHeader: '葡萄牙语', targetLang: 'Portuguese' },
-            { columnHeader: '越南语', targetLang: 'Vietnamese' }
-
+            { columnHeader: '越南语', targetLang: 'Vietnamese' },
+            { columnHeader: '繁体中文', targetLang: 'TraditionalChinese' }
         ];
     }
 
@@ -74,7 +74,9 @@ export class LanguageUtils {
             'th': 'Thai',
             'it': 'Italian',
             'id': 'Indonesian',
-            'pt': 'Portuguese'
+            'pt': 'Portuguese',
+            'zh-TW': 'TraditionalChinese',
+            'zh-HK': 'TraditionalChinese'
         };
         
         return languageCodeMap[langCode] || langCode;
@@ -98,6 +100,10 @@ export class LanguageUtils {
         // 特殊处理源语言
         if (columnHeader === '简体中文' || columnHeader === '中文') {
             return 'Chinese';
+        }
+        
+        if (columnHeader === '繁體中文' || columnHeader === '繁体中文') {
+            return 'TraditionalChinese';
         }
         
         return null;
@@ -124,7 +130,8 @@ export class LanguageUtils {
             'Italian': '意大利语',
             'Indonesian': '印尼语',
             'Portuguese': '葡萄牙语',
-            'Vietnamese': '越南语'
+            'Vietnamese': '越南语',
+            'TraditionalChinese': '繁体中文'
         };
         
         return languageNameMap[langCode] || langCode;

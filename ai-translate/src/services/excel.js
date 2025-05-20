@@ -85,7 +85,9 @@ class ExcelService {
             '泰语': 'Thai',
             '意大利语': 'Italian',
             '印尼语': 'Indonesian',
-            '葡萄牙语': 'Portuguese'
+            '葡萄牙语': 'Portuguese',
+            '越南语': 'Vietnamese',
+            '繁体中文': 'TraditionalChinese'
         };
         
         return mapping[header] || header;
@@ -400,7 +402,8 @@ class ExcelService {
                 'Italian': '意大利语',
                 'Indonesian': '印尼语',
                 'Portuguese': '葡萄牙语',
-                'Vietnamese': '越南语'
+                'Vietnamese': '越南语',
+                'TraditionalChinese': '繁体中文',
             };
             
             // 准备数据

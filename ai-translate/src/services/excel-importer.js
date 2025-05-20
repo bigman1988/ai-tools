@@ -16,7 +16,8 @@ export class ExcelImporter {
             '意大利语': 'Italian',
             '印尼语': 'Indonesian',
             '葡萄牙语': 'Portuguese',
-            '越南语': 'Vietnamese'
+            '越南语': 'Vietnamese',
+            '繁体中文': 'TraditionalChinese'
         };
     }
 
