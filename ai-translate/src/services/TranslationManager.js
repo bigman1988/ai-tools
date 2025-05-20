@@ -90,7 +90,7 @@ export class TranslationManager {
      * @param {number} batchSize - 批次大小
      * @returns {Array} - 批次数组
      */
-    organizeTasksIntoBatches(tasks, batchSize = 1) {
+    organizeTasksIntoBatches(tasks, batchSize = 20) {
         // 按目标语言分组
         const tasksByLanguage = {};
         for (const task of tasks) {
@@ -195,12 +195,13 @@ export class TranslationManager {
                         
                         for (const task of batch.tasks) {
                             // 只有当任务有翻译结果时才更新单元格
-                            if (task.text && typeof task.text === 'string' && task.text.trim() !== '') {
+                            let translation = task.translation;
+                            if (translation && typeof translation === 'string' && translation.trim() !== '') {
                                 // 更新数据模型
-                                rows[task.rowIndex][task.targetColumnIndex] = task.text;
+                                rows[task.rowIndex][task.targetColumnIndex] = translation;
                                 
                                 // 直接更新DOM中的单元格内容，而不是重新渲染整个表格
-                                updateCellCallback(task.rowIndex + 2, task.targetColumnIndex, task.text);
+                                updateCellCallback(task.rowIndex + 2, task.targetColumnIndex, translation);
                                 tasksWithResults++;
                             } else {
                                 tasksWithoutResults++;

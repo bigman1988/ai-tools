@@ -234,21 +234,33 @@ export class TranslationService {
                     return success;
                 }
                 
-                // 收集所有任务的文本和目标语言
+                // 使用JSON格式组织翻译请求和处理结果
+                // 创建带有ID的源文本数组
+                const sourceTexts = validTasks.map((t, idx) => ({
+                    id: idx,
+                    text: t.text
+                }));
+                
                 const requestBody = {
-                    model: "qwen-mt-turbo",
+                    model: "deepseek-r1",
                     messages: [
                         {
+                            role: "system",
+                            content: `你是一个专业的翻译助手。请将以下${LanguageUtils.getLanguageName(sourceLang)}文本翻译成${LanguageUtils.getLanguageName(targetLang)}。
+
+我将提供一个JSON格式的数组，其中包含多个对象，每个对象有id和text字段。请将每个对象的text字段翻译成${LanguageUtils.getLanguageName(targetLang)}，并返回一个新的JSON格式数组，包含原始id和翻译后的文本。
+
+返回格式应为: [{"id": 0, "translation": "翻译结果1"}, {"id": 1, "translation": "翻译结果2"}, ...]
+
+只返回翻译结果的JSON数组，不要添加任何解释或额外内容。重要：不要翻译特殊标记<color=#xxxxxx>,</color>,//n 等，这些是格式标记或特殊字符，应原样保留。`
+                        },
+                        {
                             role: "user",
-                            content: validTasks.map(t => t.text).join('\n')
+                            content: JSON.stringify(sourceTexts)
                         }
                     ],
-                    translation_options: {
-                        source_lang: LanguageUtils.getApiLanguageCode(sourceLang),
-                        target_lang: LanguageUtils.getApiLanguageCode(targetLang)
-                    },
-                    temperature: 0.7,
-                    max_tokens: 2000 // 增加最大token数限制，因为我们现在一次翻译多条
+                    temperature: 0.8,
+                    max_tokens: 8000 // 增加最大token数限制，因为我们现在一次翻译多条
                 };
                 
                 // 打印请求体
@@ -289,25 +301,48 @@ export class TranslationService {
 
                 // 获取翻译结果并分配给每个任务
                 const translatedContent = data.choices[0].message.content;
-                const translatedLines = typeof translatedContent === 'string' ? 
-                    translatedContent.trim().split('\n') : 
-                    [String(translatedContent)];
-                console.log(`收到 ${translatedLines.length} 行翻译结果，共 ${validTasks.length} 个任务`);
+                console.log('原始翻译结果:', translatedContent);
                 
-                // 确保翻译结果行数与任务数量匹配
-                const minLength = Math.min(translatedLines.length, validTasks.length);
-                
-                for (let i = 0; i < minLength; i++) {
-                    const translatedLine = translatedLines[i];
-                    // 设置translation字段而不是覆盖text字段
-                    validTasks[i].translation = typeof translatedLine === 'string' ? 
-                        translatedLine.trim() : String(translatedLine);
-                    console.log(`翻译成功 - 行号: ${validTasks[i].rowIndex + 1}, 译文: ${validTasks[i].translation}`);
+                let translatedResults = [];
+                try {
+                    // 尝试提取JSON部分
+                    const jsonMatch = translatedContent.match(/\[\s*\{.*\}\s*\]/s);
+                    const jsonContent = jsonMatch ? jsonMatch[0] : translatedContent;
+                    
+                    // 解析JSON结果
+                    translatedResults = JSON.parse(jsonContent);
+                    console.log(`成功解析JSON翻译结果，包含 ${translatedResults.length} 个条目`);
+                } catch (parseError) {
+                    console.error('解析JSON翻译结果失败:', parseError);
+                    this.logCallback(`解析翻译结果失败: ${parseError.message}`, 'error');
+                    throw new Error(`解析翻译结果失败: ${parseError.message}`);
                 }
                 
-                // 如果翻译结果行数少于任务数量，记录错误
-                if (translatedLines.length < validTasks.length) {
-                    const missingCount = validTasks.length - translatedLines.length;
+                // 创建一个映射来存储ID和翻译结果
+                const translationMap = {};
+                for (const result of translatedResults) {
+                    if (result.id !== undefined && result.translation) {
+                        translationMap[result.id] = result.translation;
+                        console.log(`解析翻译结果 - ID ${result.id}: ${result.translation}`);
+                    }
+                }
+                
+                // 将翻译结果分配给每个任务
+                let translatedCount = 0;
+                for (let i = 0; i < validTasks.length; i++) {
+                    if (translationMap[i] !== undefined) {
+                        // 设置translation字段而不是覆盖text字段
+                        validTasks[i].translation = translationMap[i];
+                        console.log(`翻译成功 - 行号: ${validTasks[i].rowIndex + 1}, 译文: ${validTasks[i].translation}`);
+                        translatedCount++;
+                    } else {
+                        console.log(`未找到ID ${i} 的翻译结果`);
+                    }
+                }
+                
+                // 如果有任务没有收到翻译结果，记录警告
+                if (translatedCount < validTasks.length) {
+                    const missingCount = validTasks.length - translatedCount;
                     this.logCallback(`警告: ${missingCount} 个任务没有收到翻译结果`, 'warning');
                 }
                 
@@ -357,33 +392,37 @@ export class TranslationService {
             // 获取翻译记忆
             const tmList = await this.getTranslationMemory(task.text, sourceLang, targetLang);
             
-            // 构建API请求体
+            // 构建DeepSeek翻译API请求体
             const requestBody = {
-                model: "qwen-mt-turbo",
+                model: "deepseek-r1",
                 messages: [
+                    {
+                        role: "system",
+                        content: `你是一个专业的翻译助手。请将以下${LanguageUtils.getLanguageName(sourceLang)}文本翻译成${LanguageUtils.getLanguageName(targetLang)}，只返回翻译结果，不要添加任何解释或额外内容。`
+                    },
                     {
                         role: "user",
                         content: task.text
                     }
                 ],
-                translation_options: {
-                    source_lang: LanguageUtils.getApiLanguageCode(sourceLang),
-                    target_lang: LanguageUtils.getApiLanguageCode(targetLang)
-                },
-                temperature: 0.7,
-                max_tokens: 1000
+                temperature: 0.3,
+                max_tokens: 2000
             };
             
-            // 如果有翻译记忆，添加到请求中
+            // 如果有翻译记忆，添加到系统提示中
             if (tmList && tmList.length > 0) {
-                requestBody.translation_options.tm_list = tmList;
+                let tmPrompt = "参考以下翻译记忆进行翻译:\n";
+                tmList.forEach((tm, index) => {
+                    tmPrompt += `参考${index + 1}: ${tm.source} => ${tm.target}\n`;
+                });
+                requestBody.messages[0].content = tmPrompt + requestBody.messages[0].content;
                 console.log(`使用 ${tmList.length} 条翻译记忆`);
             }
             
             // 打印请求体
             console.log('发送单个翻译请求体:', JSON.stringify(requestBody, null, 2));
             
-            // 发送API请求
+            // 发送API请求 - 仍使用通义千问的API端点
             const response = await fetch(this.apiEndpoint, {
                 method: 'POST',
                 headers: {

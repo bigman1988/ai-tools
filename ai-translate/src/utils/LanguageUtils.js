@@ -102,4 +102,31 @@ export class LanguageUtils {
         
         return null;
     }
+    
+    /**
+     * 获取语言的中文名称
+     * @param {string} langCode - 语言代码
+     * @returns {string} - 语言的中文名称
+     */
+    static getLanguageName(langCode) {
+        if (!langCode) return '';
+        
+        const languageNameMap = {
+            'Chinese': '中文',
+            'English': '英语',
+            'Japanese': '日语',
+            'Korean': '韩语',
+            'Spanish': '西班牙语',
+            'French': '法语',
+            'German': '德语',
+            'Russian': '俄语',
+            'Thai': '泰语',
+            'Italian': '意大利语',
+            'Indonesian': '印尼语',
+            'Portuguese': '葡萄牙语',
+            'Vietnamese': '越南语'
+        };
+        
+        return languageNameMap[langCode] || langCode;
+    }
 }
