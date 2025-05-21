@@ -90,7 +90,7 @@ export class TranslationManager {
      * @param {number} batchSize - 批次大小
      * @returns {Array} - 批次数组
      */
-    organizeTasksIntoBatches(tasks, batchSize = 50) {
+    organizeTasksIntoBatches(tasks, batchSize = 25) {
         // 按目标语言分组
         const tasksByLanguage = {};
         for (const task of tasks) {
