@@ -242,7 +242,7 @@ export class TranslationService {
                 }));
                 
                 const requestBody = {
-                    model: "deepseek-r1",
+                    model: "deepseek-v3",
                     messages: [
                         {
                             role: "system",
@@ -259,7 +259,7 @@ export class TranslationService {
                             content: JSON.stringify(sourceTexts)
                         }
                     ],
-                    temperature: 0.8,
+                    temperature: 0.3,
                     max_tokens: 8000 // 增加最大token数限制，因为我们现在一次翻译多条
                 };
                 
@@ -389,8 +389,8 @@ export class TranslationService {
             
             console.log(`开始单个翻译 - 源语言: ${sourceLang}, 目标语言: ${targetLang}, 文本: ${task.text}`);
             
-            // 获取翻译记忆
-            const tmList = await this.getTranslationMemory(task.text, sourceLang, targetLang);
+            // // 获取翻译记忆
+            // const tmList = await this.getTranslationMemory(task.text, sourceLang, targetLang);
             
             // 构建DeepSeek翻译API请求体
             const requestBody = {
@@ -409,15 +409,15 @@ export class TranslationService {
                 max_tokens: 2000
             };
             
-            // 如果有翻译记忆，添加到系统提示中
-            if (tmList && tmList.length > 0) {
-                let tmPrompt = "参考以下翻译记忆进行翻译:\n";
-                tmList.forEach((tm, index) => {
-                    tmPrompt += `参考${index + 1}: ${tm.source} => ${tm.target}\n`;
-                });
-                requestBody.messages[0].content = tmPrompt + requestBody.messages[0].content;
-                console.log(`使用 ${tmList.length} 条翻译记忆`);
-            }
+            // // 如果有翻译记忆，添加到系统提示中
+            // if (tmList && tmList.length > 0) {
+            //     let tmPrompt = "参考以下翻译记忆进行翻译:\n";
+            //     tmList.forEach((tm, index) => {
+            //         tmPrompt += `参考${index + 1}: ${tm.source} => ${tm.target}\n`;
+            //     });
+            //     requestBody.messages[0].content = tmPrompt + requestBody.messages[0].content;
+            //     console.log(`使用 ${tmList.length} 条翻译记忆`);
+            // }
             
             // 打印请求体
             console.log('发送单个翻译请求体:', JSON.stringify(requestBody, null, 2));

@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "调试服务器",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/src/server.js",
+      "outFiles": ["${workspaceFolder}/**/*.js"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "调试翻译器",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/debug.js",
+      "outFiles": ["${workspaceFolder}/**/*.js"]
+    }
+  ]
+}

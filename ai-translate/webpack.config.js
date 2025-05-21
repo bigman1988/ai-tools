@@ -8,12 +8,16 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// 获取环境变量
+const mode = process.env.NODE_ENV || 'development';
+console.log(`当前构建模式: ${mode}`);
+
 export default {
     entry: {
         main: './src/index.js',
         knowledgeBase: './src/knowledge-base.js'
     },
-    mode: 'development', 
+    mode, 
     devtool: 'source-map', 
     module: {
         rules: [
@@ -63,7 +67,9 @@ export default {
             filename: 'knowledge-base.html',
             chunks: ['knowledgeBase']
         }),
-        new Dotenv(),
+        new Dotenv({
+            systemvars: true // 允许系统环境变量覆盖.env文件中的变量
+        }),
         new webpack.ProvidePlugin({
             process: 'process/browser',
             Buffer: ['buffer', 'Buffer']
