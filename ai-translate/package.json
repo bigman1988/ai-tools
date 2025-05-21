@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "webpack serve",
-    "build": "webpack --mode production",
+    "build": "cross-env NODE_ENV=production webpack",
     "dev": "cross-env NODE_ENV=development webpack serve --open",
     "server": "node src/server.js"
   },
