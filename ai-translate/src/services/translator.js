@@ -266,21 +266,45 @@ export class TranslationService {
                 // 打印请求体
                 console.log('发送翻译请求体:', JSON.stringify(requestBody, null, 2));
                 
-                const response = await fetch(this.apiEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${typeof this.apiKey === 'string' ? this.apiKey.trim() : this.apiKey}`,
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(requestBody)
-                });
+                // 设置5分钟超时（300000毫秒）
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 300000);
+                
+                let response;
+                try {
+                    response = await fetch(this.apiEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${typeof this.apiKey === 'string' ? this.apiKey.trim() : this.apiKey}`,
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify(requestBody),
+                        signal: controller.signal
+                    });
+                    
+                    // 清除超时计时器
+                    clearTimeout(timeoutId);
 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error(`翻译API错误 - 状态码: ${response.status}, 错误信息:`, errorText);
-                    this.logCallback(`翻译API错误: ${response.status} - ${errorText}`, 'error');
-                    throw new Error(`翻译API错误: ${response.status}`);
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error(`翻译API错误 - 状态码: ${response.status}, 错误信息:`, errorText);
+                        this.logCallback(`翻译API错误: ${response.status} - ${errorText}`, 'error');
+                        throw new Error(`翻译API错误: ${response.status}`);
+                    }
+                } catch (fetchError) {
+                    // 清除超时计时器
+                    clearTimeout(timeoutId);
+                    
+                    if (fetchError.name === 'AbortError') {
+                        console.error('翻译请求超时（5分钟）');
+                        this.logCallback('翻译请求超时（5分钟）', 'error');
+                        throw new Error('翻译请求超时（5分钟）');
+                    }
+                    
+                    console.error('翻译请求失败:', fetchError);
+                    this.logCallback(`翻译请求失败: ${fetchError.message}`, 'error');
+                    throw fetchError;
                 }
 
                 const responseText = await response.text();
@@ -422,16 +446,40 @@ export class TranslationService {
             // 打印请求体
             console.log('发送单个翻译请求体:', JSON.stringify(requestBody, null, 2));
             
-            // 发送API请求 - 仍使用通义千问的API端点
-            const response = await fetch(this.apiEndpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${typeof this.apiKey === 'string' ? this.apiKey.trim() : this.apiKey}`,
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify(requestBody)
-            });
+            // 设置5分钟超时（300000毫秒）
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 300000);
+            
+            let response;
+            try {
+                // 发送API请求 - 使用DeepSeek的API端点
+                response = await fetch(this.apiEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${typeof this.apiKey === 'string' ? this.apiKey.trim() : this.apiKey}`,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody),
+                    signal: controller.signal
+                });
+                
+                // 清除超时计时器
+                clearTimeout(timeoutId);
+            } catch (fetchError) {
+                // 清除超时计时器
+                clearTimeout(timeoutId);
+                
+                if (fetchError.name === 'AbortError') {
+                    console.error('单个翻译请求超时（5分钟）');
+                    this.logCallback('翻译请求超时（5分钟）', 'error');
+                    throw new Error('翻译请求超时（5分钟）');
+                }
+                
+                console.error('单个翻译请求失败:', fetchError);
+                this.logCallback(`翻译请求失败: ${fetchError.message}`, 'error');
+                throw fetchError;
+            }
             
             if (!response.ok) {
                 const errorText = await response.text();
